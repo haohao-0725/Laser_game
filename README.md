@@ -8,16 +8,25 @@
 
 ## 專案狀態
 
-🚧 初始化階段。開發步驟見 [docs/development_roadmap.md](docs/development_roadmap.md)。
+🚧 Phase 0（規格與地基）完成：規則已對照官方資料查證、venv 環境就緒、
+權威規則資料（`data/`）與 Agent 開發手冊（`docs/agent_manual/`）已建立。
+目前進度與下一步見 [PROGRESS.md](PROGRESS.md)。
 
 ## 文件
 
 | 文件 | 內容 |
 |---|---|
-| [docs/development_roadmap.md](docs/development_roadmap.md) | 開發路線圖（交接文件：未來要做的所有步驟） |
-| [docs/rules_spec.md](docs/rules_spec.md) | 實作級規則規格書（引擎開發依據） |
+| [PROGRESS.md](PROGRESS.md) | **進度儀表板**（接手先看這個） |
+| [docs/agent_manual/00_INDEX.md](docs/agent_manual/00_INDEX.md) | **Agent 開發手冊導讀**（各 Phase 完整參考實作與驗收標準） |
+| [docs/development_roadmap.md](docs/development_roadmap.md) | 開發路線圖（高層規劃） |
+| [docs/rules_spec.md](docs/rules_spec.md) | 實作級規則規格書（已查證版） |
 | [docs/asset_generation_guide.md](docs/asset_generation_guide.md) | 美術素材清單與 AI 生圖提示詞（給 ChatGPT 用） |
 | [AGENT.md](AGENT.md) | Agent 開發約定（環境、語言、編碼） |
+
+## 權威規則資料（雙平台共用）
+
+- `data/layouts.json` — 三種官方佈局、限制格、Sphinx 定義（已查證，勿手改）
+- `data/laser_table.json` — 雷射互動真值表（由 `scripts/gen_laser_table.py` 生成，勿手改）
 
 ## 技術棧（規劃）
 

@@ -1,0 +1,330 @@
+{
+  "_readme": [
+    "雷射互動真值表。由 scripts/gen_laser_table.py 產生，禁止手動修改。",
+    "用法：LASER_TABLE[type][orientation][beam_dir] -> reflect/absorb/hit。",
+    "beam_dir 是光束行進方向：0=N 1=E 2=S 3=W。",
+    "Python 引擎與未來 JS 手機版必須載入同一份檔案，保證雙平台規則一致。"
+  ],
+  "directions": {
+    "N": 0,
+    "E": 1,
+    "S": 2,
+    "W": 3
+  },
+  "table": {
+    "PHARAOH": [
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ]
+    ],
+    "SPHINX": [
+      [
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        }
+      ],
+      [
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        }
+      ],
+      [
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        }
+      ],
+      [
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "absorb"
+        }
+      ]
+    ],
+    "SCARAB": [
+      [
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        },
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        }
+      ],
+      [
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        },
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        }
+      ],
+      [
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        },
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        }
+      ],
+      [
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        },
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        }
+      ]
+    ],
+    "ANUBIS": [
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "absorb"
+        }
+      ],
+      [
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "absorb"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ]
+    ],
+    "PYRAMID": [
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        }
+      ],
+      [
+        {
+          "result": "reflect",
+          "dir": 1
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        }
+      ],
+      [
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "reflect",
+          "dir": 2
+        },
+        {
+          "result": "hit"
+        },
+        {
+          "result": "hit"
+        }
+      ],
+      [
+        {
+          "result": "hit"
+        },
+        {
+          "result": "reflect",
+          "dir": 0
+        },
+        {
+          "result": "reflect",
+          "dir": 3
+        },
+        {
+          "result": "hit"
+        }
+      ]
+    ]
+  }
+}

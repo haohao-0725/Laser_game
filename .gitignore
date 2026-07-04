@@ -21,3 +21,5 @@ Thumbs.db
 
 # Large dev assets (raw AI-generated images before curation)
 dev_assets/raw/
+# 使用者生圖工具輸出的原始檔（改名成正式檔名後才進版控）
+assets/ChatGPT*

@@ -7,12 +7,15 @@
 
 ---
 
-## Phase 0：規格定案（0.5 天）✅ 部分完成
+## Phase 0：規格定案（0.5 天）✅ 完成（2026-07-04，僅名稱未定）
 
 - [x] 規則規格書初版（rules_spec.md）
-- [ ] 對照 Khet 2.0 官方規則書補齊【待查證】項目：限制格位置、Sphinx 合法朝向、
-      三種初始佈局座標 → 存成 `layouts.json`
+- [x] 對照官方規則補齊【待查證】項目：限制格位置、Sphinx 合法朝向、
+      三種初始佈局座標 → 已存成 `data/layouts.json`（查證記錄見 agent_manual/03 §7）
+- [x] 雷射真值表 → `data/laser_table.json`（scripts/gen_laser_table.py 生成）
+- [x] venv 環境 + requirements.txt + Agent 手冊（docs/agent_manual/，接手必讀）
 - [ ] 決定正式名稱與主題（公開發布不可用 "Khet" 名稱與其美術；規則本身無版權問題）
+      ——Phase 5 發布前與使用者確認即可
 
 ## Phase 1：核心規則引擎（1-2 天）⭐ 一切的地基
 
