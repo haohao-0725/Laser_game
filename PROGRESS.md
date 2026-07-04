@@ -5,16 +5,17 @@
 
 ## 目前狀態
 
-- **階段**：Phase 0 完成 ✅ → **下一步：Phase 1 規則引擎**
-- **下一個具體動作**：讀 `docs/agent_manual/04_phase1_engine.md`，
-  建立 `khet/engine.py`（章內有完整參考實作），接著照 05 章建測試，全綠後回來更新本檔。
+- **階段**：Phase 1 完成 ✅ → **下一步：Phase 2 桌面 GUI**
+- **下一個具體動作**：讀 `docs/agent_manual/06_phase2_gui.md`，建立 `gui/` 套件與 `main.py`。
+  ⚠️ 注意：`assets/` 的圖片使用者還在製作中（目前資料夾裡是未改名的原始檔，已被 gitignore），
+  GUI 一律先用 QPainter 佔位圖形，寫成「檔案存在才用圖」的 fallback 模式。
 
 ## Phase 總表
 
 | Phase | 內容 | 狀態 | 完成日 |
 |---|---|---|---|
 | 0 | 規格定案 + 規則查證 + 環境 + 手冊 | ✅ 完成 | 2026-07-04 |
-| 1 | 規則引擎 + 測試 | ⬜ 未開始 | |
+| 1 | 規則引擎 + 測試 | ✅ 完成 | 2026-07-04 |
 | 2 | 桌面 GUI（PyQt6） | ⬜ 未開始 | |
 | 3 | 對戰 AI | ⬜ 未開始 | |
 | 4 | 謎題模式 | ⬜ 未開始 | |
@@ -39,4 +40,5 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-04 | Phase 1：khet/engine.py + 三個測試檔；AGENT.md 改寫；assets 原始圖改為 gitignore | pytest 94 passed ✅ / 10 萬步 fuzz（100036 plies / 2039 games）✅ / 引擎 0 Qt import ✅ |
 | 2026-07-04 | Phase 0：環境 + 規則查證 + 資料檔 + 手冊全套 | validate_layouts ✅ / gen_laser_table 自檢 ✅ / pytest（尚無測試） |
