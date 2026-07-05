@@ -5,10 +5,11 @@
 
 ## 目前狀態
 
-- **階段**：Phase 1 完成 ✅ → **下一步：Phase 2 桌面 GUI**
-- **下一個具體動作**：讀 `docs/agent_manual/06_phase2_gui.md`，建立 `gui/` 套件與 `main.py`。
-  ⚠️ 注意：`assets/` 的圖片使用者還在製作中（目前資料夾裡是未改名的原始檔，已被 gitignore），
-  GUI 一律先用 QPainter 佔位圖形，寫成「檔案存在才用圖」的 fallback 模式。
+- **階段**：Phase 2 完成 ✅ → **下一步：Phase 3 對戰 AI**
+- **下一個具體動作**：讀 `docs/agent_manual/07_phase3_ai.md`，建立 `khet/ai.py` 與
+  `scripts/selfplay.py`，然後在 GUI 加入「人機對戰」模式（AI 用 QThreadPool 跑避免凍結）。
+- 美術素材：26 張已全部就位（檔名符合規範、方向已逐張驗證 = orientation 0 基準）。
+  GUI 仍保留佔位圖形 fallback（素材缺檔也能跑）。
 
 ## Phase 總表
 
@@ -16,7 +17,7 @@
 |---|---|---|---|
 | 0 | 規格定案 + 規則查證 + 環境 + 手冊 | ✅ 完成 | 2026-07-04 |
 | 1 | 規則引擎 + 測試 | ✅ 完成 | 2026-07-04 |
-| 2 | 桌面 GUI（PyQt6） | ⬜ 未開始 | |
+| 2 | 桌面 GUI（PyQt6） | ✅ 完成 | 2026-07-05 |
 | 3 | 對戰 AI | ⬜ 未開始 | |
 | 4 | 謎題模式 | ⬜ 未開始 | |
 | 5 | 打磨 + 桌面發布 v1.0 | ⬜ 未開始 | |
@@ -40,5 +41,6 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-05 | Phase 2：gui/（assets 快取+fallback、對局管理、棋盤+雷射動畫、主視窗）+ main.py；素材 26 張就位並驗證方向；離屏渲染目視驗證（開局/選取/光束/爆閃） | pytest 97 passed ✅（含 GUI offscreen smoke） |
 | 2026-07-04 | Phase 1：khet/engine.py + 三個測試檔；AGENT.md 改寫；assets 原始圖改為 gitignore | pytest 94 passed ✅ / 10 萬步 fuzz（100036 plies / 2039 games）✅ / 引擎 0 Qt import ✅ |
 | 2026-07-04 | Phase 0：環境 + 規則查證 + 資料檔 + 手冊全套 | validate_layouts ✅ / gen_laser_table 自檢 ✅ / pytest（尚無測試） |
