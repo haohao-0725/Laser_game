@@ -63,6 +63,36 @@ def test_board_renders_to_image(app):
     assert not pixmap.isNull() and pixmap.width() > 0
 
 
+def test_ai_mode_wiring(app):
+    """人機模式：AI 任務同步執行 → 結果經 signal 進 board（不跑動畫計時器）。"""
+    from gui.main_window import MainWindow, _AITask
+    from khet.engine import legal_actions
+
+    win = MainWindow()
+    win.set_ai_mode("easy")
+    assert win.ai_difficulty == "easy" and win.controller.ply_count == 0
+
+    # 玩家（銀方）走一手 → 輪到 AI（紅方）
+    win.controller.do_action(legal_actions(win.controller.state)[0])
+    assert win.controller.state[0] == "RED"
+
+    # 同步跑 AI 任務（不經 thread pool），驗證 token 防護與落子路徑
+    win._ai_token += 1
+    win.board.input_locked = True
+    task = _AITask(win.controller.state, "easy", win._ai_token, win._ai_signals)
+    task.run()
+    app.processEvents()
+    assert win.controller.ply_count == 2          # AI 已落子
+    assert win.board.input_locked is False
+
+    # 過期 token 的結果要被丟棄
+    stale = _AITask(win.controller.state, "easy", win._ai_token - 1, win._ai_signals)
+    stale.run()
+    app.processEvents()
+    assert win.controller.ply_count == 2
+    win.close()
+
+
 def test_engine_layer_has_no_qt_import():
     """鐵律：khet/ 不得依賴 Qt。"""
     import khet.engine as eng

@@ -1,6 +1,7 @@
-"""主視窗：選單、狀態列、勝負/和局處理。"""
+"""主視窗：選單、狀態列、勝負/和局處理、人機對戰（AI 背景執行緒）。"""
 import os
 
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QFileDialog, QLabel, QMainWindow, QMessageBox,
@@ -14,6 +15,8 @@ LAYOUT_NAMES = {"classic": "經典（Classic）",
                 "imhotep": "印和闐（Imhotep）",
                 "dynasty": "王朝（Dynasty）"}
 COLOR_NAMES = {"SILVER": "銀方", "RED": "紅方"}
+AI_NAMES = {"easy": "簡單", "medium": "中等", "hard": "困難"}
+AI_COLOR = "RED"            # AI 固定執紅（後手），玩家執銀先手
 
 RULES_TEXT = """\
 【目標】用雷射擊落對方的指揮核心（王）。
@@ -34,6 +37,27 @@ RULES_TEXT = """\
 【和局】同一局面第三次出現判和。銀方先手。"""
 
 
+class _AISignals(QObject):
+    done = pyqtSignal(int, object)      # (token, action)
+
+
+class _AITask(QRunnable):
+    def __init__(self, state, difficulty: str, token: int, signals: _AISignals,
+                 history_counts: dict | None = None):
+        super().__init__()
+        self.state = state
+        self.difficulty = difficulty
+        self.token = token
+        self.signals = signals
+        self.history_counts = history_counts
+
+    def run(self) -> None:
+        from khet.ai import choose_action
+        action = choose_action(self.state, self.difficulty,
+                               history_counts=self.history_counts)
+        self.signals.done.emit(self.token, action)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -42,6 +66,10 @@ class MainWindow(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         self.controller = GameController("classic")
+        self.ai_difficulty: str | None = None      # None = 雙人對戰
+        self._ai_token = 0
+        self._ai_signals = _AISignals()
+        self._ai_signals.done.connect(self._on_ai_done)
         self.board = BoardWidget(self.controller)
         self.board.turn_finished.connect(self._on_turn_finished)
         self.setCentralWidget(self.board)
@@ -78,21 +106,37 @@ class MainWindow(QMainWindow):
         quit_act.triggered.connect(self.close)
         game_menu.addAction(quit_act)
 
+        mode_menu = self.menuBar().addMenu("模式(&M)")
+        pvp_act = QAction("雙人對戰（同機輪流）", self)
+        pvp_act.triggered.connect(lambda: self.set_ai_mode(None))
+        mode_menu.addAction(pvp_act)
+        ai_menu = mode_menu.addMenu("人機對戰（你執銀方先手）")
+        for key, name in AI_NAMES.items():
+            act = QAction(f"AI 難度：{name}", self)
+            act.triggered.connect(lambda _=False, k=key: self.set_ai_mode(k))
+            ai_menu.addAction(act)
+
         help_menu = self.menuBar().addMenu("說明(&H)")
         rules_act = QAction("遊戲規則(&R)", self)
         rules_act.triggered.connect(self.show_rules)
         help_menu.addAction(rules_act)
 
-    # ------------------------------------------------------------ 動作
+    # ------------------------------------------------------------ 模式與對局
+    def set_ai_mode(self, difficulty: str | None) -> None:
+        self.ai_difficulty = difficulty
+        self.new_game(self.controller.layout)
+
     def new_game(self, layout: str) -> None:
+        self._ai_token += 1                 # 作廢所有進行中的 AI 計算結果
         self.controller = GameController(layout)
         self.board.set_controller(self.controller)
         self._update_status()
 
     def undo(self) -> None:
-        if self.board.mode == "animating":
+        if self.board.mode == "animating" or self.board.input_locked:
             return
-        self.controller.undo(1)
+        # 人機模式退 2 手（把 AI 那手一起退掉），雙人模式退 1 手
+        self.controller.undo(2 if self.ai_difficulty else 1)
         self.board.selected = None
         self.board.overlay = []
         self.board.mode = "idle"
@@ -112,15 +156,38 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            self.controller = GameController.load(path)
+            controller = GameController.load(path)
         except Exception as exc:            # 壞檔要報錯而不是閃退
             QMessageBox.warning(self, "讀檔失敗", f"無法載入存檔：\n{exc}")
             return
+        self._ai_token += 1
+        self.controller = controller
         self.board.set_controller(self.controller)
         self._update_status()
+        self._maybe_start_ai()
 
     def show_rules(self) -> None:
         QMessageBox.information(self, "遊戲規則", RULES_TEXT)
+
+    # ------------------------------------------------------------ AI 回合
+    def _maybe_start_ai(self) -> None:
+        if (self.ai_difficulty is not None
+                and self.controller.winner() is None
+                and not self.controller.is_draw_by_repetition()
+                and self.controller.state[0] == AI_COLOR):
+            self._ai_token += 1
+            self.board.input_locked = True
+            self.status_label.setText(f"　AI（{AI_NAMES[self.ai_difficulty]}）思考中…")
+            task = _AITask(self.controller.state, self.ai_difficulty,
+                           self._ai_token, self._ai_signals,
+                           dict(self.controller.position_counts))  # 複本，避免跨執行緒共享
+            QThreadPool.globalInstance().start(task)
+
+    def _on_ai_done(self, token: int, action) -> None:
+        if token != self._ai_token:         # 過期結果（新局/讀檔/悔棋後）直接丟棄
+            return
+        self.board.input_locked = False
+        self.board.play_action(action)
 
     # ------------------------------------------------------------ 回合結束
     def _on_turn_finished(self, result) -> None:
@@ -129,18 +196,26 @@ class MainWindow(QMainWindow):
         if w is not None:
             box = QMessageBox(self)
             box.setWindowTitle("勝負揭曉")
-            box.setText(f"{COLOR_NAMES[w]} 獲勝！")
+            if self.ai_difficulty is not None:
+                text = "你獲勝了！" if w != AI_COLOR else f"AI（{AI_NAMES[self.ai_difficulty]}）獲勝！"
+            else:
+                text = f"{COLOR_NAMES[w]} 獲勝！"
+            box.setText(text)
             again = box.addButton("再來一局", QMessageBox.ButtonRole.AcceptRole)
             box.addButton("關閉", QMessageBox.ButtonRole.RejectRole)
             box.exec()
             if box.clickedButton() == again:
                 self.new_game(self.controller.layout)
-        elif self.controller.is_draw_by_repetition():
+            return
+        if self.controller.is_draw_by_repetition():
             QMessageBox.information(self, "和局", "同一局面第三次出現——依規則判和。")
+            return
+        self._maybe_start_ai()
 
     def _update_status(self) -> None:
         player, _ = self.controller.state
+        mode = ("雙人對戰" if self.ai_difficulty is None
+                else f"人機對戰（AI：{AI_NAMES[self.ai_difficulty]}）")
         self.status_label.setText(
-            f"　輪到：{COLOR_NAMES[player]}　｜　第 {self.controller.ply_count + 1} 手"
-            f"　｜　佈局：{LAYOUT_NAMES[self.controller.layout]}"
-            f"　｜　點自己的棋子 → 點綠圈移動／紫圈換位／⟳ 旋轉")
+            f"　{mode}　｜　輪到：{COLOR_NAMES[player]}　｜　第 {self.controller.ply_count + 1} 手"
+            f"　｜　佈局：{LAYOUT_NAMES[self.controller.layout]}")

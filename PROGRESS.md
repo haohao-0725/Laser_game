@@ -5,11 +5,11 @@
 
 ## 目前狀態
 
-- **階段**：Phase 2 完成 ✅ → **下一步：Phase 3 對戰 AI**
-- **下一個具體動作**：讀 `docs/agent_manual/07_phase3_ai.md`，建立 `khet/ai.py` 與
-  `scripts/selfplay.py`，然後在 GUI 加入「人機對戰」模式（AI 用 QThreadPool 跑避免凍結）。
-- 美術素材：26 張已全部就位（檔名符合規範、方向已逐張驗證 = orientation 0 基準）。
-  GUI 仍保留佔位圖形 fallback（素材缺檔也能跑）。
+- **階段**：Phase 3 完成 ✅ → **下一步：Phase 4 謎題模式（或先 Phase 5 發布，見 roadmap 順序備註）**
+- **下一個具體動作**：讀 `docs/agent_manual/08_phase4_puzzles.md`，建立 `khet/puzzles.py`
+  求解器（AND-OR 搜尋）＋ `scripts/gen_puzzles.py` 生成器；或依使用者意願先走 09 章發布。
+- AI 難度實測分級：easy=深度2+噪音 / medium=深度3(0.3s) / hard=深度6上限+5s
+  （killer move + 超時部分採用 + 根洗牌 + 重複局面降權——細節與陷阱見手冊 07 章）。
 
 ## Phase 總表
 
@@ -18,7 +18,7 @@
 | 0 | 規格定案 + 規則查證 + 環境 + 手冊 | ✅ 完成 | 2026-07-04 |
 | 1 | 規則引擎 + 測試 | ✅ 完成 | 2026-07-04 |
 | 2 | 桌面 GUI（PyQt6） | ✅ 完成 | 2026-07-05 |
-| 3 | 對戰 AI | ⬜ 未開始 | |
+| 3 | 對戰 AI | ✅ 完成 | 2026-07-05 |
 | 4 | 謎題模式 | ⬜ 未開始 | |
 | 5 | 打磨 + 桌面發布 v1.0 | ⬜ 未開始 | |
 | 6 | 手機版 APK | ⬜ 未開始 | |
@@ -41,6 +41,7 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-05 | Phase 3：khet/ai.py（negamax+αβ+TT+迭代加深+killer+超時部分採用）、selfplay.py、GUI 人機對戰（QThreadPool+token 防護）；難度實測定級 2/3/6 | pytest 103 ✅；medium vs random 20/20(100%、0.31s/手) ✅；hard vs medium 7勝2敗1和(70%) ✅ |
 | 2026-07-05 | Phase 2：gui/（assets 快取+fallback、對局管理、棋盤+雷射動畫、主視窗）+ main.py；素材 26 張就位並驗證方向；離屏渲染目視驗證（開局/選取/光束/爆閃） | pytest 97 passed ✅（含 GUI offscreen smoke） |
 | 2026-07-04 | Phase 1：khet/engine.py + 三個測試檔；AGENT.md 改寫；assets 原始圖改為 gitignore | pytest 94 passed ✅ / 10 萬步 fuzz（100036 plies / 2039 games）✅ / 引擎 0 Qt import ✅ |
 | 2026-07-04 | Phase 0：環境 + 規則查證 + 資料檔 + 手冊全套 | validate_layouts ✅ / gen_laser_table 自檢 ✅ / pytest（尚無測試） |

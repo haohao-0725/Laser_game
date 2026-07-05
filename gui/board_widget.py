@@ -34,6 +34,7 @@ class BoardWidget(QWidget):
         self.controller = controller
         self.setMinimumSize(760, 620)
         self.mode = "idle"                  # idle | selected | animating
+        self.input_locked = False           # AI 思考中鎖定人類輸入
         self.selected: tuple | None = None  # (col, row)
         self.overlay: list = []             # [(QRectF, action, kind)]
         # 動畫狀態
@@ -49,10 +50,16 @@ class BoardWidget(QWidget):
         self.anim_timer.stop()
         self.controller = controller
         self.mode = "idle"
+        self.input_locked = False
         self.selected = None
         self.overlay = []
         self.anim_result = None
         self.update()
+
+    def play_action(self, action) -> None:
+        """程式化走一手（AI 用），與人類點擊走同一條動畫路徑。"""
+        if self.mode != "animating":
+            self._commit(action)
 
     # ------------------------------------------------------------ 幾何
     def _geometry(self) -> tuple[float, float, float]:
@@ -83,7 +90,8 @@ class BoardWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
             return
-        if self.mode == "animating" or self.controller.winner() is not None:
+        if (self.mode == "animating" or self.input_locked
+                or self.controller.winner() is not None):
             return
         pos = event.position()
 
