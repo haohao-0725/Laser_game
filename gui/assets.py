@@ -1,11 +1,14 @@
 """素材載入與快取。原則（AGENT.md）：檔案存在就用圖、不存在就回 None，
 由 board_widget 畫幾何佔位圖形 fallback，兩者可隨時切換。"""
 import os
+import sys
 
 from PyQt6.QtGui import QPixmap
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = getattr(sys, "_MEIPASS",
+               os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ASSETS_DIR = os.path.join(ROOT, "assets")
+SFX_DIR = os.path.join(ASSETS_DIR, "sfx")
 
 # (type, color) -> 檔名（docs/asset_generation_guide.md §7 檔名總表）
 PIECE_FILES = {
@@ -51,5 +54,26 @@ def store() -> AssetStore:
     return _store
 
 
+sound_enabled = True                 # 由設定選單切換（main_window 持久化）
+_effects: dict = {}
+
+
 def play_sound(name: str) -> None:
-    """音效佔位（Phase 5 實作）。name: laser / hit / win / click ..."""
+    """播放音效（assets/sfx/<name>.wav，由 scripts/gen_sfx.py 生成）。
+    QtMultimedia 不可用或檔案不存在時靜默略過。"""
+    if not sound_enabled:
+        return
+    try:
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtMultimedia import QSoundEffect
+    except ImportError:
+        return
+    path = os.path.join(SFX_DIR, f"{name}.wav")
+    if not os.path.exists(path):
+        return
+    if name not in _effects:
+        eff = QSoundEffect()
+        eff.setSource(QUrl.fromLocalFile(path))
+        eff.setVolume(0.5)
+        _effects[name] = eff
+    _effects[name].play()

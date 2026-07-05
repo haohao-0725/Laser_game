@@ -8,6 +8,7 @@ venv/
 build/
 dist/
 *.zip
+*.spec.bak
 
 # IDE / OS
 .vscode/

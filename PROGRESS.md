@@ -5,11 +5,12 @@
 
 ## 目前狀態
 
-- **階段**：Phase 3 完成 ✅ → **下一步：Phase 4 謎題模式（或先 Phase 5 發布，見 roadmap 順序備註）**
-- **下一個具體動作**：讀 `docs/agent_manual/08_phase4_puzzles.md`，建立 `khet/puzzles.py`
-  求解器（AND-OR 搜尋）＋ `scripts/gen_puzzles.py` 生成器；或依使用者意願先走 09 章發布。
-- AI 難度實測分級：easy=深度2+噪音 / medium=深度3(0.3s) / hard=深度6上限+5s
-  （killer move + 超時部分採用 + 根洗牌 + 重複局面降權——細節與陷阱見手冊 07 章）。
+- **階段**：Phase 4 + 5 完成 ✅ → **下一步：Phase 6 手機版（Capacitor）**
+- **下一個具體動作**：讀 `docs/agent_manual/10_phase6_mobile.md`，建立 `www/` Canvas 版，
+  用 `scripts/export_web_data.py`（尚待建立）把 data/*.json 包成 rules_data.js，
+  移植 engine.js 後先做規則一致性向量測試（400+）再寫 UI。
+- 桌面版 v1.0 已可打包發布：`.\venv\Scripts\python.exe -m PyInstaller laser_duel.spec --noconfirm`
+  → `dist\LaserDuel\LaserDuel.exe`。正式名稱暫定 **Laser Duel（雷射對決）**（可再改）。
 
 ## Phase 總表
 
@@ -19,8 +20,8 @@
 | 1 | 規則引擎 + 測試 | ✅ 完成 | 2026-07-04 |
 | 2 | 桌面 GUI（PyQt6） | ✅ 完成 | 2026-07-05 |
 | 3 | 對戰 AI | ✅ 完成 | 2026-07-05 |
-| 4 | 謎題模式 | ⬜ 未開始 | |
-| 5 | 打磨 + 桌面發布 v1.0 | ⬜ 未開始 | |
+| 4 | 謎題模式 | ✅ 完成 | 2026-07-05 |
+| 5 | 打磨 + 桌面發布 v1.0 | ✅ 完成 | 2026-07-05 |
 | 6 | 手機版 APK | ⬜ 未開始 | |
 
 （Phase 4 與 5 順序可對調，見 roadmap。正式名稱未定，發布前要問使用者。）
@@ -41,6 +42,7 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-05 | Phase 4+5：謎題求解器/生成器（39 題認證目錄）、謎題 GUI+每日一題、音效合成、設定/戰績持久化、PyInstaller 打包、smoke test、發布到 GitHub | pytest 110 ✅；目錄 39 題認證 ✅；smoke test 4 項 ✅；exe 啟動驗證 ✅ |
 | 2026-07-05 | Phase 3：khet/ai.py（negamax+αβ+TT+迭代加深+killer+超時部分採用）、selfplay.py、GUI 人機對戰（QThreadPool+token 防護）；難度實測定級 2/3/6 | pytest 103 ✅；medium vs random 20/20(100%、0.31s/手) ✅；hard vs medium 7勝2敗1和(70%) ✅ |
 | 2026-07-05 | Phase 2：gui/（assets 快取+fallback、對局管理、棋盤+雷射動畫、主視窗）+ main.py；素材 26 張就位並驗證方向；離屏渲染目視驗證（開局/選取/光束/爆閃） | pytest 97 passed ✅（含 GUI offscreen smoke） |
 | 2026-07-04 | Phase 1：khet/engine.py + 三個測試檔；AGENT.md 改寫；assets 原始圖改為 gitignore | pytest 94 passed ✅ / 10 萬步 fuzz（100036 plies / 2039 games）✅ / 引擎 0 Qt import ✅ |

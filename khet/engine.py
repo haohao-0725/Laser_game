@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------- 資料載入
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# PyInstaller frozen 模式下資料檔在 _MEIPASS 之下
+_ROOT = getattr(sys, "_MEIPASS",
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _load(name: str) -> dict:
@@ -209,6 +212,36 @@ def apply_action(state: tuple, action) -> tuple[tuple, LaserResult]:
     mid_player, mid_pieces = _apply_action_no_laser(state, action)
     new_pieces, result = resolve_laser(mid_pieces, mid_player)
     return ((other(player), new_pieces), result)
+
+
+# ---------------------------------------------------------------- 序列化
+def action_to_dict(a) -> dict:
+    if isinstance(a, Move):
+        return {"kind": "move", "col": a.col, "row": a.row, "dcol": a.dcol, "drow": a.drow}
+    if isinstance(a, Swap):
+        return {"kind": "swap", "col": a.col, "row": a.row, "dcol": a.dcol, "drow": a.drow}
+    if isinstance(a, Rotate):
+        return {"kind": "rotate", "col": a.col, "row": a.row, "cw": a.cw}
+    raise TypeError(f"unknown action: {a!r}")
+
+
+def action_from_dict(d: dict):
+    kind = d["kind"]
+    if kind == "move":
+        return Move(d["col"], d["row"], d["dcol"], d["drow"])
+    if kind == "swap":
+        return Swap(d["col"], d["row"], d["dcol"], d["drow"])
+    if kind == "rotate":
+        return Rotate(d["col"], d["row"], d["cw"])
+    raise ValueError(f"unknown action kind: {kind}")
+
+
+def pieces_to_list(pieces: tuple) -> list:
+    return [list(p) for p in pieces]
+
+
+def pieces_from_list(data: list) -> tuple:
+    return tuple(sorted((p[0], p[1], int(p[2]), int(p[3]), int(p[4])) for p in data))
 
 
 # ---------------------------------------------------------------- 勝負

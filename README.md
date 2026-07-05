@@ -8,9 +8,26 @@
 
 ## 專案狀態
 
-🚧 Phase 0（規格與地基）完成：規則已對照官方資料查證、venv 環境就緒、
-權威規則資料（`data/`）與 Agent 開發手冊（`docs/agent_manual/`）已建立。
-目前進度與下一步見 [PROGRESS.md](PROGRESS.md)。
+✅ **桌面版 v1.0 完成**：核心規則引擎、PyQt6 GUI（雙人對戰、雷射動畫、悔棋、存讀檔）、
+對戰 AI（三難度）、單人謎題模式（39 題認證目錄 + 每日一題）、音效與戰績、PyInstaller 打包。
+下一步為 Phase 6 手機版。目前進度見 [PROGRESS.md](PROGRESS.md)。
+
+## 執行與打包
+
+```powershell
+py -3.10 -m venv venv
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe main.py                                   # 執行
+.\venv\Scripts\python.exe -m pytest tests\ -q                       # 測試
+.\venv\Scripts\python.exe -m PyInstaller laser_duel.spec --noconfirm  # 打包 exe
+```
+
+## 功能
+
+- **雙人對戰**（同機輪流）＋ 三種官方佈局（經典／印和闐／王朝）
+- **人機對戰**：AI 三難度（簡單／中等／困難），背景執行緒思考不卡介面
+- **謎題模式**：39 題「N 手必勝」認證謎題（1–3 手）＋ 每日一題＋提示
+- 逐格雷射動畫、悔棋、存讀檔、音效開關、戰績記錄
 
 ## 文件
 

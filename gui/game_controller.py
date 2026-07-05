@@ -2,29 +2,9 @@
 import json
 
 from khet.engine import (
-    Move, Swap, Rotate, apply_action, initial_state, winner as engine_winner,
+    action_from_dict, action_to_dict,          # re-export（序列化的權威在引擎層）
+    apply_action, initial_state, winner as engine_winner,
 )
-
-
-def action_to_dict(a) -> dict:
-    if isinstance(a, Move):
-        return {"kind": "move", "col": a.col, "row": a.row, "dcol": a.dcol, "drow": a.drow}
-    if isinstance(a, Swap):
-        return {"kind": "swap", "col": a.col, "row": a.row, "dcol": a.dcol, "drow": a.drow}
-    if isinstance(a, Rotate):
-        return {"kind": "rotate", "col": a.col, "row": a.row, "cw": a.cw}
-    raise TypeError(f"unknown action: {a!r}")
-
-
-def action_from_dict(d: dict):
-    kind = d["kind"]
-    if kind == "move":
-        return Move(d["col"], d["row"], d["dcol"], d["drow"])
-    if kind == "swap":
-        return Swap(d["col"], d["row"], d["dcol"], d["drow"])
-    if kind == "rotate":
-        return Rotate(d["col"], d["row"], d["cw"])
-    raise ValueError(f"unknown action kind: {kind}")
 
 
 class GameController:
@@ -34,6 +14,17 @@ class GameController:
         self.history = [self.state]          # 歷代 state（含初始）
         self.actions_done: list = []          # 已執行的 action（存檔用）
         self.position_counts = {self.state: 1}
+
+    @classmethod
+    def from_state(cls, state: tuple) -> "GameController":
+        """從任意局面開局（謎題模式用）。此模式不支援重放式存檔。"""
+        gc = cls.__new__(cls)
+        gc.layout = "custom"
+        gc.state = state
+        gc.history = [state]
+        gc.actions_done = []
+        gc.position_counts = {state: 1}
+        return gc
 
     # ---------------------------------------------------------- 對局操作
     def do_action(self, action):
