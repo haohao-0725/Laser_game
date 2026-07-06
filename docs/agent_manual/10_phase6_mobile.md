@@ -20,9 +20,9 @@ www/
 └── assets/               # 縮圖化素材（棋子 256px 即可）
 ```
 
-規則資料**不要手寫 JS 版**：寫 `scripts/export_web_data.py` 把
-`data/laser_table.json`、`data/layouts.json`、`data/puzzle_catalog.json`
-包成 `rules_data.js`（`window.X = <json>;`），單一來源保持不變。
+規則資料**不要手寫 JS 版**：`scripts/export_web_data.py`（已建立）把
+`data/*.json` 包成 `www/js/rules_data.js`（同時支援 Node `module.exports` 與瀏覽器
+`window.RULES_DATA`），單一來源保持不變。改規則後要重跑它。
 
 ## 2. engine.js 移植規則
 
@@ -35,13 +35,17 @@ www/
 ## 3. 【必做】規則一致性向量測試
 
 ```
-1. Python 端：scripts/gen_test_vectors.py
-   - 從三種佈局出發，隨機走子產生 400+ 筆 (state, action) → 執行 apply_action
-   - 輸出 vectors.json：[{state_in, action, state_out, laser_path, event}, ...]
-2. JS 端：vectors_test.js 逐筆執行 engine.js 的 apply_action，
-   比對 state_out / laser_path / event 完全一致，頁面顯示「400/400 PASS」
-3. 不到 400/400 不准進下一步（前作 chaos 模式同流程，做過 400/400）
+1. Python 端：scripts/gen_test_vectors.py → www/test_vectors.json
+   （[{state_in, action, state_out, path, event, hit}, ...]）
+2. JS 端：node www/js/vectors_test.js 逐筆跑 engine.js 比對 state_out/path/event/hit
+   （瀏覽器版可載入 runVectors 顯示 N/N PASS）
+3. 不到 N/N 不准進下一步
 ```
+
+**實測結果（2026-07-06）：500/500 PASS**，一次通過。engine.js 與 khet/engine.py 位元級一致。
+pytest 的 `tests/test_web_consistency.py` 把這條流程包成 CI 測試（有 node 才跑）。
+關鍵移植陷阱：JS 的 pieces 排序 comparator 必須完全複製 Python `sorted()` 對 tuple 的
+字典序（type,color 字串比較 → col,row,ori 數字比較），否則序列化比對會全錯。
 
 ## 4. 觸控 UI 要點
 

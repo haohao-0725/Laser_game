@@ -8,9 +8,9 @@
 
 ## 專案狀態
 
-✅ **桌面版 v1.0 完成**：核心規則引擎、PyQt6 GUI（雙人對戰、雷射動畫、悔棋、存讀檔）、
-對戰 AI（三難度）、單人謎題模式（39 題認證目錄 + 每日一題）、音效與戰績、PyInstaller 打包。
-下一步為 Phase 6 手機版。目前進度見 [PROGRESS.md](PROGRESS.md)。
+✅ **桌面版 + 手機版皆完成**：桌面 PyQt6（雙人對戰、雷射動畫、AI 三難度、39 題謎題、
+音效戰績、打包 exe）；手機版 Canvas + Capacitor（對戰 + AI，與桌面規則零差異，
+500/500 向量測試通過，可打包 APK）。主線 Phase 0–6 全部完成，進度見 [PROGRESS.md](PROGRESS.md)。
 
 📥 **下載遊玩**：[Releases 頁面](https://github.com/haohao-0725/Laser_game/releases/latest)
 下載 `LaserDuel_v1.0_win64.zip`，解壓後執行 `LaserDuel.exe`（Windows 10/11 64 位元）。

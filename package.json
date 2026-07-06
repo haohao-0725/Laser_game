@@ -1,0 +1,17 @@
+{
+  "name": "laser-duel",
+  "version": "1.0.0",
+  "description": "雷射對決 Laser Duel — 手機版（Capacitor）",
+  "private": true,
+  "scripts": {
+    "export-data": "python scripts/export_web_data.py",
+    "vectors": "python scripts/gen_test_vectors.py && node www/js/vectors_test.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

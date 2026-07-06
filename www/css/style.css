@@ -1,0 +1,51 @@
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  height: 100%; background: #0b0e14; color: #e8e8f0;
+  font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+  overflow: hidden; user-select: none; -webkit-user-select: none;
+}
+body { display: flex; flex-direction: column; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: #131824; border-bottom: 1px solid #26304a;
+}
+header .title { font-weight: 700; color: #6ee7ff; letter-spacing: 1px; }
+#status { font-size: 14px; color: #b8c0d8; }
+
+#board-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 8px; min-height: 0;
+}
+#board { display: block; touch-action: none; border-radius: 6px; }
+
+#controls {
+  display: flex; gap: 8px; padding: 10px; background: #131824;
+  border-top: 1px solid #26304a;
+}
+#controls button {
+  flex: 1; padding: 14px 4px; font-size: 15px; font-weight: 600;
+  color: #e8e8f0; background: #26304a; border: none; border-radius: 8px;
+}
+#controls button:disabled { opacity: 0.35; }
+#controls button:active:not(:disabled) { background: #38507a; }
+
+#menu {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+#menu.hidden { display: none; }
+.menu-box {
+  background: #161c2a; border: 1px solid #38507a; border-radius: 12px;
+  padding: 20px; width: 100%; max-width: 340px; max-height: 90%; overflow-y: auto;
+}
+.menu-box h3 { margin: 14px 0 8px; color: #6ee7ff; font-size: 15px; }
+.menu-box h3:first-child { margin-top: 0; }
+.menu-box button {
+  display: block; width: 100%; margin: 6px 0; padding: 12px;
+  font-size: 15px; color: #e8e8f0; background: #26304a;
+  border: none; border-radius: 8px;
+}
+.menu-box button:active { background: #38507a; }
+.menu-box p { font-size: 13px; color: #aeb6cc; line-height: 1.6; margin: 4px 0 8px; }
+#menu-close { background: #38507a !important; margin-top: 14px; }

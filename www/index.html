@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>雷射對決 Laser Duel</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <span class="title">雷射對決</span>
+    <span id="status">載入中…</span>
+  </header>
+
+  <div id="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div id="controls">
+    <button id="btn-menu">選單</button>
+    <button id="btn-undo">悔棋</button>
+    <button id="btn-ccw" disabled>↺ 逆轉</button>
+    <button id="btn-cw" disabled>↻ 順轉</button>
+  </div>
+
+  <div id="menu" class="hidden">
+    <div class="menu-box">
+      <h3>選擇模式</h3>
+      <button data-mode="pvp">雙人對戰</button>
+      <button data-mode="easy">人機：簡單</button>
+      <button data-mode="medium">人機：中等</button>
+      <button data-mode="hard">人機：困難</button>
+      <h3>佈局</h3>
+      <button data-layout="classic">經典</button>
+      <button data-layout="imhotep">印和闐</button>
+      <button data-layout="dynasty">王朝</button>
+      <h3>玩法</h3>
+      <p>點自己的棋 → 點綠圈移動、紫圈換位，或用下方順/逆轉旋轉。
+         行動後雷射自動發射，小心別打到自己的王！</p>
+      <button id="menu-close" onclick="document.getElementById('menu').classList.add('hidden')">關閉</button>
+    </div>
+  </div>
+
+  <script src="js/rules_data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

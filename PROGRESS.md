@@ -5,12 +5,15 @@
 
 ## 目前狀態
 
-- **階段**：Phase 4 + 5 完成 ✅ → **下一步：Phase 6 手機版（Capacitor）**
-- **下一個具體動作**：讀 `docs/agent_manual/10_phase6_mobile.md`，建立 `www/` Canvas 版，
-  用 `scripts/export_web_data.py`（尚待建立）把 data/*.json 包成 rules_data.js，
-  移植 engine.js 後先做規則一致性向量測試（400+）再寫 UI。
-- 桌面版 v1.0 已可打包發布：`.\venv\Scripts\python.exe -m PyInstaller laser_duel.spec --noconfirm`
-  → `dist\LaserDuel\LaserDuel.exe`。正式名稱暫定 **Laser Duel（雷射對決）**（可再改）。
+- **階段**：Phase 0–6 全部完成 ✅ 🎉 專案主線完成（桌面 exe + 手機 APK 皆可產出）
+- **可能的後續（Phase 7 選配）**：線上對戰、更強 AI、棋譜重播、自訂佈局編輯器、
+  手機版謎題模式移植（目前手機版只有對戰，謎題僅桌面有）、ELO。見 roadmap Phase 7。
+- **重生手機版建置的方法**（android/ 是 gitignore）：
+  1. `npm install`
+  2. `.\venv\Scripts\python.exe scripts\export_web_data.py`（規則改過才需要）
+  3. `npx cap add android`（若無 android/）→ `npx cap sync android`
+  4. `cmd /c "cd /d <root>\android && .\gradlew.bat assembleDebug --no-daemon"`
+     （環境變數見 AGENT.md；產物 android\app\build\outputs\apk\debug\app-debug.apk）
 
 ## Phase 總表
 
@@ -22,7 +25,7 @@
 | 3 | 對戰 AI | ✅ 完成 | 2026-07-05 |
 | 4 | 謎題模式 | ✅ 完成 | 2026-07-05 |
 | 5 | 打磨 + 桌面發布 v1.0 | ✅ 完成 | 2026-07-05 |
-| 6 | 手機版 APK | ⬜ 未開始 | |
+| 6 | 手機版 APK | ✅ 完成 | 2026-07-06 |
 
 （Phase 4 與 5 順序可對調，見 roadmap。正式名稱未定，發布前要問使用者。）
 
@@ -42,6 +45,7 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-06 | Phase 6：www/ Canvas 手機版（engine.js/ai.js/game.js 移植 + 觸控 UI）、export_web_data.py、規則一致性向量測試、Capacitor + APK 建置成功（25.8MB） | pytest 111 ✅（含 web 一致性）；向量 500/500 PASS ✅；瀏覽器實測互動/AI/動畫 ✅；APK BUILD SUCCESSFUL ✅ |
 | 2026-07-05 | Phase 4+5：謎題求解器/生成器（39 題認證目錄）、謎題 GUI+每日一題、音效合成、設定/戰績持久化、PyInstaller 打包、smoke test、發布到 GitHub | pytest 110 ✅；目錄 39 題認證 ✅；smoke test 4 項 ✅；exe 啟動驗證 ✅ |
 | 2026-07-05 | Phase 3：khet/ai.py（negamax+αβ+TT+迭代加深+killer+超時部分採用）、selfplay.py、GUI 人機對戰（QThreadPool+token 防護）；難度實測定級 2/3/6 | pytest 103 ✅；medium vs random 20/20(100%、0.31s/手) ✅；hard vs medium 7勝2敗1和(70%) ✅ |
 | 2026-07-05 | Phase 2：gui/（assets 快取+fallback、對局管理、棋盤+雷射動畫、主視窗）+ main.py；素材 26 張就位並驗證方向；離屏渲染目視驗證（開局/選取/光束/爆閃） | pytest 97 passed ✅（含 GUI offscreen smoke） |

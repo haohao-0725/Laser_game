@@ -20,6 +20,13 @@ Thumbs.db
 .claude/
 .agent/
 
+# Capacitor / 手機版建置產物（android/ 由 npx cap add android 重生）
+node_modules/
+android/
+.gradle/
+# 生成物（需要時用 gen_test_vectors.py 重生）
+www/test_vectors.json
+
 # Large dev assets (raw AI-generated images before curation)
 dev_assets/raw/
 # 使用者生圖工具輸出的原始檔（改名成正式檔名後才進版控）
