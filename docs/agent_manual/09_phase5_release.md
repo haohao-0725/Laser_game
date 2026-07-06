@@ -21,17 +21,21 @@
 # 重點：datas 要把規則資料與素材帶進去
 datas = [
     ("data",   "data"),      # layouts.json / laser_table.json / puzzle_catalog.json
-    ("assets", "assets"),
+    ("assets", "assets"),    # 棋子/棋盤/特效/UI + sfx/*.wav（音效）
 ]
-# onefile 或 onedir 皆可；前作經驗 onedir 啟動較快、防毒誤判較少
 ```
+
+**打包型態決定（本專案採 onefile）**：使用者要求下載端只有單一 exe，
+故 spec 用 `EXE(pyz, a.scripts, a.binaries, a.zipfiles, a.datas, ...)` 且**不使用 COLLECT**
+（onedir 會多一包 `_internal/`）。代價：首次啟動稍慢、防毒偶有誤判，但單檔最好散佈。
+Windows 圖示必須是 `.ico`（用 pillow 從 app_icon.png 轉，見 requirements.txt 註記）。
 
 打包與驗證：
 
 ```powershell
 .\venv\Scripts\python.exe -m PyInstaller laser_duel.spec --noconfirm
 # 禁止用 pyinstaller.exe wrapper（會靜默失敗）
-dist\laser_duel\laser_duel.exe        # 手動啟動確認可玩
+dist\LaserDuel.exe                    # onefile：單一檔，手動啟動確認可玩
 ```
 
 注意：程式碼裡讀 `data/` 的路徑要支援 frozen 模式：

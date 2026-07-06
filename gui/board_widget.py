@@ -21,9 +21,12 @@ C_TARGET = QColor(90, 255, 140, 190)
 C_SWAP = QColor(160, 120, 255, 210)
 C_BEAM_GLOW = QColor(255, 110, 40, 70)
 C_BEAM_CORE = QColor(255, 235, 190, 235)
+C_LASTMOVE = QColor(120, 245, 255)      # 上一手高亮（青白，與黃色選取框區隔）
 
 ANIM_INTERVAL_MS = 35
 EXPLOSION_TICKS = 6
+PULSE_INTERVAL_MS = 40
+PULSE_STEP = 0.05                        # 每 tick 衰減量：1.0 → 0 約 0.8 秒
 
 
 class BoardWidget(QWidget):
@@ -44,22 +47,33 @@ class BoardWidget(QWidget):
         self.anim_timer = QTimer(self)
         self.anim_timer.setInterval(ANIM_INTERVAL_MS)
         self.anim_timer.timeout.connect(self._anim_tick)
+        # 上一手高亮：last_move_cells 持久顯示；AI/對手走完額外脈動閃爍
+        self.last_move_cells: list = []
+        self._pending_pulse = False
+        self.highlight_pulse = 0.0
+        self.pulse_timer = QTimer(self)
+        self.pulse_timer.setInterval(PULSE_INTERVAL_MS)
+        self.pulse_timer.timeout.connect(self._pulse_tick)
 
     # ------------------------------------------------------------ 對外
     def set_controller(self, controller) -> None:
         self.anim_timer.stop()
+        self.pulse_timer.stop()
         self.controller = controller
         self.mode = "idle"
         self.input_locked = False
         self.selected = None
         self.overlay = []
         self.anim_result = None
+        self.last_move_cells = []
+        self.highlight_pulse = 0.0
+        self._pending_pulse = False
         self.update()
 
     def play_action(self, action) -> None:
-        """程式化走一手（AI 用），與人類點擊走同一條動畫路徑。"""
+        """程式化走一手（AI / 對手用）：走完會脈動閃爍提示，讓玩家看清對方動了哪裡。"""
         if self.mode != "animating":
-            self._commit(action)
+            self._commit(action, pulse=True)
 
     # ------------------------------------------------------------ 幾何
     def _geometry(self) -> tuple[float, float, float]:
@@ -148,11 +162,23 @@ class BoardWidget(QWidget):
                     r = QRectF(sel_rect.left(), sel_rect.bottom() - btn, btn, btn)
                     self.overlay.append((r, a, "rotate_ccw"))
 
-    def _commit(self, action) -> None:
+    @staticmethod
+    def _action_cells(action) -> list:
+        """行動涉及的格子（供上一手高亮）。"""
+        cells = [(action.col, action.row)]
+        if isinstance(action, (Move, Swap)):
+            cells.append((action.col + action.dcol, action.row + action.drow))
+        return cells
+
+    def _commit(self, action, pulse: bool = False) -> None:
         result = self.controller.do_action(action)
         play_sound("laser")
         self.selected = None
         self.overlay = []
+        self.last_move_cells = self._action_cells(action)
+        self._pending_pulse = pulse
+        self.highlight_pulse = 0.0
+        self.pulse_timer.stop()
         self.anim_result = result
         self.anim_progress = 1
         self.explosion_tick = 0
@@ -171,9 +197,20 @@ class BoardWidget(QWidget):
         else:
             self.anim_timer.stop()
             self.mode = "idle"
+            if self._pending_pulse:          # AI/對手走完 → 脈動閃爍吸引注意
+                self._pending_pulse = False
+                self.highlight_pulse = 1.0
+                self.pulse_timer.start()
             self.update()
             self.turn_finished.emit(res)
             return
+        self.update()
+
+    def _pulse_tick(self) -> None:
+        self.highlight_pulse -= PULSE_STEP
+        if self.highlight_pulse <= 0.0:
+            self.highlight_pulse = 0.0
+            self.pulse_timer.stop()
         self.update()
 
     # ------------------------------------------------------------ 繪製
@@ -186,12 +223,30 @@ class BoardWidget(QWidget):
         ox, oy, cs = self._geometry()
         board_rect = QRectF(ox, oy, cs * 10, cs * 8)
         self._draw_board(painter, board_rect, cs)
+        self._draw_last_move(painter, cs)
         self._draw_pieces(painter, cs)
         self._draw_selection(painter)
         self._draw_overlay(painter, cs)
         if self.mode == "animating":
             self._draw_beam(painter, cs)
         painter.end()
+
+    def _draw_last_move(self, painter, cs) -> None:
+        """上一手的起訖格高亮：持久淡框 + 脈動時加亮加粗（AI 走完的提示）。"""
+        if not self.last_move_cells:
+            return
+        p = self.highlight_pulse
+        fill = QColor(C_LASTMOVE.red(), C_LASTMOVE.green(), C_LASTMOVE.blue(),
+                      int(34 + 90 * p))
+        border = QColor(C_LASTMOVE.red(), C_LASTMOVE.green(), C_LASTMOVE.blue(),
+                        int(150 + 105 * p))
+        width = 2.5 + 4.0 * p
+        for col, row in self.last_move_cells:
+            rect = self._cell_rect(col, row).adjusted(2, 2, -2, -2)
+            painter.fillRect(rect, fill)
+            painter.setPen(QPen(border, width))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(rect)
 
     def _draw_board(self, painter, board_rect, cs) -> None:
         bg = store().image("board_bg.png")

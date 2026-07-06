@@ -49,6 +49,10 @@ ANIMATING（雷射動畫播放中，輸入鎖定）：
 行動鈕實作提示：在 board_widget 上以浮動 QPushButton 或自繪 hit-region 皆可；
 前作 Ricochet Robots 的做法是自繪圖示 + 座標命中測試，比較好控制縮放。
 
+**上一手高亮（已實作）**：`last_move_cells` 記錄上一手的起訖格，持久畫青白淡框；
+AI/對手經 `play_action` 走完時 `_pending_pulse=True`，動畫結束後觸發 `pulse_timer`
+脈動閃爍 ~0.8 秒——因為 AI 出手瞬間完成，玩家常看不清動了哪裡，這個提示是必要的。
+
 ## 雷射動畫（本遊戲的靈魂，值得花時間）
 
 `apply_action` 回傳的 `LaserResult.path` 是光束經過的每一格。動畫做法：
