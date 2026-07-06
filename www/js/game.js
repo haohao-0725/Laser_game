@@ -224,9 +224,11 @@
   }
   function startPulse() {
     pulse = 1.0;
+    var hold = 15;                 // 先維持全亮 ~0.6 秒，再淡出 ~2.0 秒（總長 ~2.6 秒）
     if (pulseTimer) clearInterval(pulseTimer);
     pulseTimer = setInterval(function () {
-      pulse -= 0.05; if (pulse <= 0) { pulse = 0; clearInterval(pulseTimer); pulseTimer = null; }
+      if (hold > 0) { hold--; }
+      else { pulse -= 0.02; if (pulse <= 0) { pulse = 0; clearInterval(pulseTimer); pulseTimer = null; } }
       render();
     }, 40);
   }
