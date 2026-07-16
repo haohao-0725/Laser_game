@@ -8,12 +8,13 @@
 
 ## 專案狀態
 
-✅ **桌面版 + 手機版皆完成**：桌面 PyQt6（雙人對戰、雷射動畫、AI 三難度、39 題謎題、
-音效戰績、打包 exe）；手機版 Canvas + Capacitor（對戰 + AI，與桌面規則零差異，
-500/500 向量測試通過，可打包 APK）。主線 Phase 0–6 全部完成，進度見 [PROGRESS.md](PROGRESS.md)。
+✅ **桌面版 v1.1.0 + 手機版 v1.0 皆可遊玩**：桌面 PyQt6（雙人對戰、雷射動畫、
+AI v2 三難度、39 題謎題、音效戰績、打包 exe）；手機版 Canvas + Capacitor 維持 v1.0。
+桌面 AI v2 已加入完整三次同形搜尋、PVS、戰術延伸與更完整的局面評估，進度見
+[PROGRESS.md](PROGRESS.md)。
 
 📥 **下載遊玩**：[Releases 頁面](https://github.com/haohao-0725/Laser_game/releases/latest)
-下載 `LaserDuel_v1.0_win64.zip`，解壓後執行 `LaserDuel.exe`（Windows 10/11 64 位元）。
+下載 `LaserDuel_v1.1.0_win64.zip`，解壓後執行 `LaserDuel.exe`（Windows 10/11 64 位元）。
 
 ## 執行與打包
 
@@ -28,7 +29,7 @@ py -3.10 -m venv venv
 ## 功能
 
 - **雙人對戰**（同機輪流）＋ 三種官方佈局（經典／印和闐／王朝）
-- **人機對戰**：AI 三難度（簡單／中等／困難），背景執行緒思考不卡介面
+- **人機對戰**：AI v2 三難度（簡單／中等／困難），背景執行緒思考不卡介面
 - **謎題模式**：39 題「N 手必勝」認證謎題（1–3 手）＋ 每日一題＋提示
 - 逐格雷射動畫、悔棋、存讀檔、音效開關、戰績記錄
 
@@ -52,4 +53,5 @@ py -3.10 -m venv venv
 
 - 桌面版：Python 3.10 + PyQt6，PyInstaller 打包 exe
 - 手機版：Web（Canvas）+ Capacitor 打包 APK（沿用 Ricochet Robots 專案已驗證的雙平台管線）
-- AI：minimax + alpha-beta 剪枝（迭代加深、走法排序），單人謎題由搜尋反向生成認證
+- AI：PVS/negamax + alpha-beta（迭代加深、置換表、戰術搜尋、三次同形），
+  單人謎題由搜尋反向生成認證

@@ -1,202 +1,566 @@
-"""對戰 AI：negamax + alpha-beta 剪枝 + 置換表 + 迭代加深。
-純搜尋層（引擎之上），禁止 GUI 依賴。介面：choose_action(state, difficulty)。
-"""
+"""桌面對戰 AI v2：可重複局面感知的 PVS/alpha-beta 搜尋。"""
 from __future__ import annotations
 
+from collections import OrderedDict
+from functools import lru_cache
 import random
 import time
 
 from khet.engine import (
-    Move, Rotate, Swap, apply_action, board_map, legal_actions,
-    other, resolve_laser, winner,
+    MOVE_VECTORS, Move, Rotate, Swap, apply_action, board_map, can_occupy,
+    in_board, legal_actions, other, resolve_laser, winner,
 )
 
 WIN = 1_000_000
-# 子力價值。PHARAOH 不計（沒了就是輸，由 WIN 處理）；SCARAB 不可能被移除，
-# 材料上是常數，故為 0。
-PIECE_VALUE = {"PHARAOH": 0, "SPHINX": 0, "SCARAB": 0, "ANUBIS": 900, "PYRAMID": 500}
-GUARD_BONUS = 40          # 法老周邊每顆己方棋的肉盾加分
-THREAT_PHARAOH = 5000     # 「現在發射就能打中法老」的威脅分
+DRAW = 0
+MATE_THRESHOLD = WIN - 10_000
+INF = WIN * 2
+
+PIECE_VALUE = {
+    "PHARAOH": 0,
+    "SPHINX": 0,
+    "SCARAB": 0,
+    "ANUBIS": 900,
+    "PYRAMID": 500,
+}
+GUARD_BONUS = 40
+PHARAOH_ESCAPE_BONUS = 8
+MOBILITY_BONUS = 1
+SCARAB_SWAP_BONUS = 4
+BEAM_CELL_BONUS = 1
+BEAM_REFLECTION_BONUS = 6
+BEAM_NEAR_PHARAOH = 40
+SELF_HIT_PENALTY = 80
+THREAT_PHARAOH = 5_000
+ABSORB_PRESSURE = 20
+
 _EXACT, _LOWER, _UPPER = 0, 1, 2
-_TIME_CHECK_INTERVAL = 512
+_TIME_CHECK_INTERVAL = 128
+_ASPIRATION = 350
+_Q_DEPTH = 1
+_Q_MAX_MOVES = 12
+_TT_MAX = 250_000
+_EXPANSION_CACHE_MAX = 256
+_REP_MASK = (1 << 64) - 1
 
 
 class _Timeout(Exception):
     pass
 
 
-def evaluate(state: tuple) -> int:
-    """回傳「輪到走的一方」觀點的分數（negamax 慣例）。不處理已分勝負的局面。"""
-    player, pieces = state
-    occ = board_map(pieces)
-    score = {"RED": 0, "SILVER": 0}
-    pharaohs = {}
-    for p in pieces:
-        score[p[1]] += PIECE_VALUE[p[0]]
-        if p[0] == "PHARAOH":
-            pharaohs[p[1]] = p
+def _chebyshev_to_path(cell: tuple[int, int], path: tuple) -> int:
+    if not path:
+        return 99
+    return min(max(abs(cell[0] - col), abs(cell[1] - row)) for col, row in path)
 
-    # 法老安全度：周邊 8 格的己方棋數
-    for color, ph in pharaohs.items():
+
+@lru_cache(maxsize=50_000)
+def _position_scores(pieces: tuple) -> tuple[int, int, bool]:
+    """一次整理雙方靜態特徵；相同 pieces 換手時可直接重用。"""
+    occ = board_map(pieces)
+    scores = {"RED": 0, "SILVER": 0}
+    pharaohs = {}
+    for piece in pieces:
+        scores[piece[1]] += PIECE_VALUE[piece[0]]
+        if piece[0] == "PHARAOH":
+            pharaohs[piece[1]] = piece
+
+    mobility = {"RED": 0, "SILVER": 0}
+    scarab_swaps = {"RED": 0, "SILVER": 0}
+    pharaoh_escapes = {"RED": 0, "SILVER": 0}
+    for piece in pieces:
+        ptype, color, col, row, _ = piece
+        if ptype == "SPHINX":
+            continue
+        for dcol, drow in MOVE_VECTORS:
+            ncol, nrow = col + dcol, row + drow
+            if not in_board(ncol, nrow):
+                continue
+            target = occ.get((ncol, nrow))
+            if target is None and can_occupy(color, ncol, nrow):
+                mobility[color] += 1
+                if ptype == "PHARAOH":
+                    pharaoh_escapes[color] += 1
+            elif (ptype == "SCARAB" and target is not None
+                  and target[0] in ("PYRAMID", "ANUBIS")
+                  and can_occupy(color, ncol, nrow)
+                  and can_occupy(target[1], col, row)):
+                mobility[color] += 1
+                scarab_swaps[color] += 1
+
+    for color, pharaoh in pharaohs.items():
+        scores[color] += mobility[color] * MOBILITY_BONUS
+        scores[color] += scarab_swaps[color] * SCARAB_SWAP_BONUS
+        scores[color] += pharaoh_escapes[color] * PHARAOH_ESCAPE_BONUS
         guard = 0
         for dc in (-1, 0, 1):
             for dr in (-1, 0, 1):
                 if dc == 0 and dr == 0:
                     continue
-                q = occ.get((ph[2] + dc, ph[3] + dr))
-                if q is not None and q[1] == color:
+                neighbour = occ.get((pharaoh[2] + dc, pharaoh[3] + dr))
+                if neighbour is not None and neighbour[1] == color:
                     guard += 1
-        score[color] += guard * GUARD_BONUS
+        scores[color] += guard * GUARD_BONUS
 
-    # 雷射威脅：假想雙方「現在就發射」會打掉什麼（粗略但便宜的一手威脅偵測）
+    volatile = False
     for color in ("RED", "SILVER"):
-        _, res = resolve_laser(pieces, color)
-        if res.event == "hit":
-            victim = res.hit_piece
-            v = THREAT_PHARAOH if victim[0] == "PHARAOH" else PIECE_VALUE[victim[0]] // 2 + 50
-            score[victim[1]] -= v
+        enemy = other(color)
+        _, result = resolve_laser(pieces, color)
+        path = result.path[1:]
+        scores[color] += min(len(set(path)), 30) * BEAM_CELL_BONUS
+        reflections = sum(
+            1 for cell in path[:-1]
+            if (cell in occ and occ[cell][0] in ("PYRAMID", "SCARAB"))
+        )
+        scores[color] += reflections * BEAM_REFLECTION_BONUS
 
-    return score[player] - score[other(player)]
+        enemy_pharaoh = pharaohs.get(enemy)
+        if enemy_pharaoh is not None:
+            distance = _chebyshev_to_path((enemy_pharaoh[2], enemy_pharaoh[3]), path)
+            if distance <= 2:
+                scores[enemy] -= (3 - distance) * BEAM_NEAR_PHARAOH
+            if distance <= 1:
+                volatile = True
+
+        if result.event == "hit":
+            volatile = True
+            victim = result.hit_piece
+            value = (THREAT_PHARAOH if victim[0] == "PHARAOH"
+                     else PIECE_VALUE[victim[0]] // 2 + 50)
+            scores[victim[1]] -= value
+            if victim[1] == color:
+                scores[color] -= SELF_HIT_PENALTY
+        elif result.event == "absorb" and result.path:
+            blocker = occ.get(result.path[-1])
+            if blocker is not None and blocker[1] == enemy:
+                scores[enemy] -= ABSORB_PRESSURE
+
+    return scores["RED"], scores["SILVER"], volatile
 
 
-def _terminal_score(state: tuple, w: str, ply: int) -> int:
-    """勝負已定時，從「輪到走的一方」觀點給分；ply 越小的勝利分數越高（催促速勝）。"""
-    return (WIN - ply) if w == state[0] else -(WIN - ply)
+def evaluate(state: tuple) -> int:
+    """回傳輪到走的一方觀點的靜態分數；終局由搜尋器先處理。"""
+    player, pieces = state
+    red, silver, _ = _position_scores(pieces)
+    return (red - silver) if player == "RED" else (silver - red)
 
 
-def _order_actions(actions: list, tt_best, killers: tuple = ()) -> list:
-    """走法排序：置換表最佳手 → killer 手（曾引發剪枝）→ 換位/移動 → 旋轉。"""
-    def key(a):
-        if tt_best is not None and a == tt_best:
-            return 0
-        if a in killers:
-            return 1
-        if isinstance(a, Swap):
-            return 2
-        if isinstance(a, Move):
-            return 3
-        return 4
-    return sorted(actions, key=key)
+def _terminal_score(state: tuple, victor: str, ply: int) -> int:
+    return (WIN - ply) if victor == state[0] else -(WIN - ply)
+
+
+def _score_to_tt(score: int, ply: int) -> int:
+    if score >= MATE_THRESHOLD:
+        return score + ply
+    if score <= -MATE_THRESHOLD:
+        return score - ply
+    return score
+
+
+def _score_from_tt(score: int, ply: int) -> int:
+    if score >= MATE_THRESHOLD:
+        return score - ply
+    if score <= -MATE_THRESHOLD:
+        return score + ply
+    return score
+
+
+@lru_cache(maxsize=250_000)
+def _repetition_token(state: tuple, count: int) -> int:
+    return hash((state, count, 0x4B484554)) & _REP_MASK
+
+
+def _history_hash(counts: dict) -> int:
+    value = 0
+    for state, count in counts.items():
+        if count >= 2:
+            value ^= _repetition_token(state, count)
+    return value
 
 
 class _Searcher:
     def __init__(self, deadline: float):
         self.deadline = deadline
-        self.tt: dict = {}          # state -> (depth, score, flag, best_action)
-        self.killers: dict = {}     # ply -> (action, action)：該層曾引發 beta 剪枝的手
+        # repetition hash 也是 key 的一部分，避免不同歷史錯用同一 TT 分數。
+        self.tt: dict = {}
+        self.killers: dict = {}
+        self.history: dict = {}
+        # 迭代加深會重複展開靠近根部的局面；小型 LRU 可省去重做規則結算。
+        self.expansions: OrderedDict = OrderedDict()
+        self.eval_cache: dict = {}
         self.nodes = 0
+        self.qnodes = 0
+        self.tt_hits = 0
+        self.cutoffs = 0
 
     def _tick(self) -> None:
         self.nodes += 1
         if self.nodes % _TIME_CHECK_INTERVAL == 0 and time.monotonic() > self.deadline:
             raise _Timeout
 
-    def negamax(self, state: tuple, depth: int, alpha: int, beta: int, ply: int) -> int:
-        self._tick()
-        w = winner(state)
-        if w is not None:
-            return _terminal_score(state, w, ply)
-        if depth == 0:
-            return evaluate(state)
+    def _check_time(self) -> None:
+        if time.monotonic() > self.deadline:
+            raise _Timeout
 
-        alpha_orig = alpha
-        entry = self.tt.get(state)
+    def _evaluate(self, state: tuple) -> int:
+        score = self.eval_cache.get(state)
+        if score is None:
+            score = evaluate(state)
+            if len(self.eval_cache) >= 50_000:
+                self.eval_cache.clear()
+            self.eval_cache[state] = score
+        return score
+
+    def expand(self, state: tuple) -> tuple:
+        cached = self.expansions.get(state)
+        if cached is not None:
+            self.expansions.move_to_end(state)
+            return cached
+        entries = []
+        for index, action in enumerate(legal_actions(state)):
+            if index % 16 == 0:
+                self._check_time()
+            child, result = apply_action(state, action)
+            entries.append((action, child, result))
+        result = tuple(entries)
+        self.expansions[state] = result
+        if len(self.expansions) > _EXPANSION_CACHE_MAX:
+            self.expansions.popitem(last=False)
+        return result
+
+    def forcing_entries(self, state: tuple) -> tuple:
+        """只結算確實可能改變目前光路的行動，避免 qsearch 重展開全部分支。"""
+        player, pieces = state
+        occ = board_map(pieces)
+        _, current_laser = resolve_laser(pieces, player)
+        beam_cells = set(current_laser.path)
+        candidates = []
+        unchanged_representative = None
+        for action in legal_actions(state):
+            source = (action.col, action.row)
+            target = source
+            if isinstance(action, (Move, Swap)):
+                target = (action.col + action.dcol, action.row + action.drow)
+            piece = occ[source]
+            affects_beam = (
+                piece[0] == "SPHINX"
+                or source in beam_cells
+                or target in beam_cells
+            )
+            if affects_beam:
+                candidates.append(action)
+            elif current_laser.event == "hit" and unchanged_representative is None:
+                # 光路原本已會吃子；其餘不碰光路的手在 qsearch 中等價，留一手即可。
+                unchanged_representative = action
+        if unchanged_representative is not None:
+            candidates.append(unchanged_representative)
+
+        forcing = []
+        for index, action in enumerate(candidates):
+            if index % 12 == 0:
+                self._check_time()
+            child, laser = apply_action(state, action)
+            if laser.event == "hit" or winner(child) is not None:
+                forcing.append((action, child, laser))
+        return tuple(forcing)
+
+    def _order(self, state: tuple, entries: tuple, tt_best, ply: int) -> list:
+        player = state[0]
+        killers = self.killers.get(ply, ())
+
+        def priority(entry):
+            action, child, laser = entry
+            score = self.history.get((player, action), 0)
+            victor = winner(child)
+            if victor == player:
+                score += 4_000_000_000
+            elif laser.event == "hit":
+                victim = laser.hit_piece
+                value = PIECE_VALUE[victim[0]] + 100
+                score += (3_000_000_000 + value if victim[1] != player
+                          else -1_000_000_000 - value)
+            if action == tt_best:
+                score += 2_000_000_000
+            if action in killers:
+                score += 1_000_000_000
+            if isinstance(action, Swap):
+                score += 300
+            elif isinstance(action, Move):
+                score += 200
+            elif isinstance(action, Rotate):
+                score += 100
+            return score
+
+        return sorted(entries, key=priority, reverse=True)
+
+    def _descend(self, child: tuple, laser, callback, counts: dict, rep_hash: int):
+        # 吃子後棋子數單調減少，先前局面再也不可能重現，可安全重置循環歷史。
+        if laser.event == "hit":
+            child_counts = {child: 1}
+            return callback(child_counts, 0)
+
+        old_count = counts.get(child, 0)
+        if old_count >= 2:
+            rep_hash ^= _repetition_token(child, old_count)
+        new_count = old_count + 1
+        counts[child] = new_count
+        if new_count >= 2:
+            rep_hash ^= _repetition_token(child, new_count)
+        try:
+            return callback(counts, rep_hash)
+        finally:
+            if old_count:
+                counts[child] = old_count
+            else:
+                counts.pop(child, None)
+
+    def _store_tt(self, key, depth: int, score: int, flag: int, action, ply: int) -> None:
+        if len(self.tt) >= _TT_MAX and key not in self.tt:
+            self.tt.pop(next(iter(self.tt)))
+        self.tt[key] = (depth, _score_to_tt(score, ply), flag, action)
+
+    def negamax(self, state: tuple, depth: int, alpha: int, beta: int, ply: int,
+                counts: dict, rep_hash: int) -> int:
+        self._tick()
+        victor = winner(state)
+        if victor is not None:
+            return _terminal_score(state, victor, ply)
+        if counts.get(state, 0) >= 3:
+            return DRAW
+        if depth <= 0:
+            if _position_scores(state[1])[2]:
+                return self.qsearch(state, alpha, beta, ply, _Q_DEPTH, counts, rep_hash)
+            return self._evaluate(state)
+
+        alpha_orig, beta_orig = alpha, beta
+        key = (state, rep_hash)
+        entry = self.tt.get(key)
         tt_best = None
         if entry is not None:
-            e_depth, e_score, e_flag, tt_best = entry
-            if e_depth >= depth:
-                if e_flag == _EXACT:
-                    return e_score
-                if e_flag == _LOWER:
-                    alpha = max(alpha, e_score)
-                elif e_flag == _UPPER:
-                    beta = min(beta, e_score)
+            entry_depth, stored_score, flag, tt_best = entry
+            score = _score_from_tt(stored_score, ply)
+            if entry_depth >= depth:
+                self.tt_hits += 1
+                if flag == _EXACT:
+                    return score
+                if flag == _LOWER:
+                    alpha = max(alpha, score)
+                else:
+                    beta = min(beta, score)
                 if alpha >= beta:
-                    return e_score
+                    return score
 
-        best = -WIN * 2
-        best_act = None
-        killers = self.killers.get(ply, ())
-        for a in _order_actions(legal_actions(state), tt_best, killers):
-            child, _ = apply_action(state, a)
-            val = -self.negamax(child, depth - 1, -beta, -alpha, ply + 1)
-            if val > best:
-                best, best_act = val, a
-            alpha = max(alpha, val)
+        best = -INF
+        best_action = None
+        ordered = self._order(state, self.expand(state), tt_best, ply)
+        for index, (action, child, laser) in enumerate(ordered):
+            def full(child_counts, child_hash):
+                return -self.negamax(
+                    child, depth - 1, -beta, -alpha, ply + 1,
+                    child_counts, child_hash,
+                )
+
+            if index == 0:
+                value = self._descend(child, laser, full, counts, rep_hash)
+            else:
+                def scout(child_counts, child_hash):
+                    return -self.negamax(
+                        child, depth - 1, -alpha - 1, -alpha, ply + 1,
+                        child_counts, child_hash,
+                    )
+                value = self._descend(child, laser, scout, counts, rep_hash)
+                if alpha < value < beta:
+                    value = self._descend(child, laser, full, counts, rep_hash)
+
+            if value > best:
+                best, best_action = value, action
+            if value > alpha:
+                alpha = value
             if alpha >= beta:
-                if a not in killers:            # 記住剪枝手，同層兄弟節點優先試
-                    self.killers[ply] = (a,) + killers[:1]
+                self.cutoffs += 1
+                killers = self.killers.get(ply, ())
+                if action not in killers:
+                    self.killers[ply] = (action,) + killers[:1]
+                key_h = (state[0], action)
+                self.history[key_h] = self.history.get(key_h, 0) + depth * depth
                 break
 
         flag = _EXACT
         if best <= alpha_orig:
             flag = _UPPER
-        elif best >= beta:
+        elif best >= beta_orig:
             flag = _LOWER
-        self.tt[state] = (depth, best, flag, best_act)
+        self._store_tt(key, depth, best, flag, best_action, ply)
+        return best
+
+    def qsearch(self, state: tuple, alpha: int, beta: int, ply: int, qdepth: int,
+                counts: dict, rep_hash: int) -> int:
+        self.qnodes += 1
+        self._check_time()
+        victor = winner(state)
+        if victor is not None:
+            return _terminal_score(state, victor, ply)
+        if counts.get(state, 0) >= 3:
+            return DRAW
+
+        stand_pat = self._evaluate(state)
+        if qdepth <= 0 or stand_pat >= beta:
+            return stand_pat
+        if stand_pat > alpha:
+            alpha = stand_pat
+
+        forcing = self.forcing_entries(state)
+        if not forcing:
+            return stand_pat
+
+        best = stand_pat
+        for action, child, laser in self._order(state, forcing, None, ply)[:_Q_MAX_MOVES]:
+            def descend(child_counts, child_hash):
+                return -self.qsearch(
+                    child, -beta, -alpha, ply + 1, qdepth - 1,
+                    child_counts, child_hash,
+                )
+            value = self._descend(child, laser, descend, counts, rep_hash)
+            if value > best:
+                best = value
+            if value > alpha:
+                alpha = value
+            if alpha >= beta:
+                self.cutoffs += 1
+                break
         return best
 
 
-REPEAT_PENALTY = 150      # 根節點：走向「已出現過的局面」每次出現扣的分（避免和局迴圈）
+def _prepare_history(state: tuple, history_counts: dict | None) -> dict:
+    material = len(state[1])
+    counts = {
+        old_state: count
+        for old_state, count in (history_counts or {}).items()
+        if count > 0 and len(old_state[1]) == material
+    }
+    counts[state] = max(1, counts.get(state, 0))
+    return counts
+
+
+def _search_root(searcher: _Searcher, state: tuple, depth: int,
+                 alpha: int, beta: int, entries: list,
+                 counts: dict, rep_hash: int):
+    scores = {}
+    best_score, best_action = -INF, None
+    timed_out = False
+    root_alpha = alpha
+    try:
+        for index, (action, child, laser) in enumerate(entries):
+            def full(child_counts, child_hash):
+                return -searcher.negamax(
+                    child, depth - 1, -beta, -root_alpha, 1,
+                    child_counts, child_hash,
+                )
+
+            if index == 0:
+                value = searcher._descend(child, laser, full, counts, rep_hash)
+            else:
+                def scout(child_counts, child_hash):
+                    return -searcher.negamax(
+                        child, depth - 1, -root_alpha - 1, -root_alpha, 1,
+                        child_counts, child_hash,
+                    )
+                value = searcher._descend(child, laser, scout, counts, rep_hash)
+                if root_alpha < value < beta:
+                    value = searcher._descend(child, laser, full, counts, rep_hash)
+
+            scores[action] = value
+            if value > best_score:
+                best_score, best_action = value, action
+            if value > root_alpha:
+                root_alpha = value
+            if root_alpha >= beta:
+                searcher.cutoffs += 1
+                break
+    except _Timeout:
+        timed_out = True
+    return best_score, best_action, scores, timed_out
 
 
 def search(state: tuple, max_depth: int, time_limit: float = 3.0,
            noise: int = 0, rng: random.Random | None = None,
            history_counts: dict | None = None):
-    """迭代加深搜尋，回傳 (best_action, info)。超時回傳最後完成深度的結果。
-    history_counts：對局至今各 state 出現次數（三次同形偵測用的那份），
-    用來在根節點降權「走回舊局面」的手。"""
+    """迭代加深 PVS；三次同形在整棵搜尋樹中直接視為 0 分終局。"""
+    counts = _prepare_history(state, history_counts)
+    if counts.get(state, 0) >= 3:
+        raise RuntimeError("目前局面已因三次同形判和")
+
     searcher = _Searcher(time.monotonic() + time_limit)
-    root_actions = legal_actions(state)
-    if not root_actions:
+    root_entries = list(searcher.expand(state))
+    if not root_entries:
         raise RuntimeError("無合法行動（規則上不可能）")
     rng = rng or random.Random()
-    rng.shuffle(root_actions)     # 打破決定性：同分手隨機挑，對局才有變化
-    best_action = root_actions[0]
+    rng.shuffle(root_entries)
+
+    rep_hash = _history_hash(counts)
+    best_action = root_entries[0][0]
+    best_score = 0
     completed_depth = 0
-    # 上一輪各手分數 → 這一輪的根排序
-    prev_scores = {a: 0 for a in root_actions}
+    completed_scores = {}
+    prev_scores = {}
 
     for depth in range(1, max_depth + 1):
-        ordered = sorted(root_actions, key=lambda a: -prev_scores.get(a, 0))
-        alpha, beta = -WIN * 2, WIN * 2
-        scores = {}
-        iter_best, iter_best_act = -WIN * 2, None
-        timed_out = False
-        try:
-            for a in ordered:
-                child, _ = apply_action(state, a)
-                val = -searcher.negamax(child, depth - 1, -beta, -alpha, 1)
-                if history_counts:
-                    val -= REPEAT_PENALTY * history_counts.get(child, 0)
-                if noise:
-                    val += rng.uniform(-noise, noise)
-                scores[a] = val
-                if val > iter_best:
-                    iter_best, iter_best_act = val, a
-                alpha = max(alpha, val)
-        except _Timeout:
-            timed_out = True
-        # 部分完成的一輪也採用目前最佳：排最前的是上輪最佳手（已重搜過），
-        # 因此部分結果只會「換成更深層驗證過更好的手」，不會變差。
-        if iter_best_act is not None:
-            best_action = iter_best_act
-        if not timed_out:
-            prev_scores = scores
-            completed_depth = depth
-        if timed_out or iter_best >= WIN - depth - 1:   # 超時或已找到必勝
+        ordered = sorted(
+            root_entries,
+            key=lambda entry: -prev_scores.get(entry[0], 0),
+        )
+        if completed_depth:
+            alpha, beta = best_score - _ASPIRATION, best_score + _ASPIRATION
+        else:
+            alpha, beta = -INF, INF
+
+        score, action, scores, timed_out = _search_root(
+            searcher, state, depth, alpha, beta, ordered, counts, rep_hash,
+        )
+        if action is not None:
+            best_action = action
+        if timed_out:
             break
 
-    info = {"depth": completed_depth, "nodes": searcher.nodes}
+        if score <= alpha or score >= beta:
+            score, action, scores, timed_out = _search_root(
+                searcher, state, depth, -INF, INF, ordered, counts, rep_hash,
+            )
+            if action is not None:
+                best_action = action
+            if timed_out:
+                break
+
+        best_score = score
+        prev_scores = scores
+        completed_scores = scores
+        completed_depth = depth
+        if noise and scores:
+            best_action = max(
+                scores,
+                key=lambda candidate: scores[candidate] + rng.uniform(-noise, noise),
+            )
+        elif action is not None:
+            best_action = action
+        if best_score >= WIN - depth - 1:
+            break
+
+    info = {
+        "depth": completed_depth,
+        "score": best_score,
+        "nodes": searcher.nodes,
+        "qnodes": searcher.qnodes,
+        "tt_hits": searcher.tt_hits,
+        "cutoffs": searcher.cutoffs,
+        "root_scores": completed_scores,
+    }
     return best_action, info
 
 
-# 深度分級 2/3/6 是 Python 效能實測後的決定（開局深度 4≈2s、深度 5≈20s）：
-# medium 固定深度 3 秒出手快、強度穩定；hard 用時限 + 超時部分採用逐步逼近 4-5 層。
 DIFFICULTIES = {
     "easy": dict(max_depth=2, time_limit=1.0, noise=250),
     "medium": dict(max_depth=3, time_limit=3.0, noise=0),
-    "hard": dict(max_depth=6, time_limit=5.0, noise=0),
+    "hard": dict(max_depth=7, time_limit=5.0, noise=0),
 }
 
 
@@ -205,7 +569,7 @@ def choose_action(state: tuple, difficulty: str = "medium",
                   rng: random.Random | None = None,
                   history_counts: dict | None = None):
     cfg = DIFFICULTIES[difficulty]
-    action, _info = search(
+    action, _ = search(
         state,
         max_depth=cfg["max_depth"],
         time_limit=cfg["time_limit"] if time_limit is None else time_limit,

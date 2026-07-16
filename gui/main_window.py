@@ -279,6 +279,9 @@ class MainWindow(QMainWindow):
         if token != self._token:            # 過期結果（新局/讀檔/悔棋後）丟棄
             return
         self.board.input_locked = False
+        if (self.controller.winner() is not None
+                or self.controller.is_draw_by_repetition()):
+            return
         self.board.play_action(action)
 
     # ------------------------------------------------------------ 回合結束

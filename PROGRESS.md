@@ -5,9 +5,9 @@
 
 ## 目前狀態
 
-- **階段**：Phase 0–6 全部完成 ✅ 🎉 專案主線完成（桌面 exe + 手機 APK 皆可產出）
-- **可能的後續（Phase 7 選配）**：線上對戰、更強 AI、棋譜重播、自訂佈局編輯器、
-  手機版謎題模式移植（目前手機版只有對戰，謎題僅桌面有）、ELO。見 roadmap Phase 7。
+- **階段**：Phase 0–7A 完成 ✅ 桌面版 AI v2／v1.1.0 已完成；手機版維持 v1.0。
+- **可能的後續（Phase 7 選配）**：線上對戰、棋譜重播、自訂佈局編輯器、ELO、
+  AI 認證平衡開局庫。手機版 AI v2／三次同形同步此次依使用者指示暫不維護。
 - **重生手機版建置的方法**（android/ 是 gitignore）：
   1. `npm install`
   2. `.\venv\Scripts\python.exe scripts\export_web_data.py`（規則改過才需要）
@@ -26,6 +26,7 @@
 | 4 | 謎題模式 | ✅ 完成 | 2026-07-05 |
 | 5 | 打磨 + 桌面發布 v1.0 | ✅ 完成 | 2026-07-05 |
 | 6 | 手機版 APK | ✅ 完成 | 2026-07-06 |
+| 7A | 桌面 AI v2（和局搜尋、PVS、戰術／局面評估） | ✅ 完成 | 2026-07-16 |
 
 （Phase 4 與 5 順序可對調，見 roadmap。正式名稱未定，發布前要問使用者。）
 
@@ -39,12 +40,13 @@
 
 ## 異常記錄（發現文件矛盾、規則疑義、環境問題都記在這）
 
-（目前無）
+- 手機版仍是 v1.0：尚未同步桌面 AI v2，也尚未加入三次同形對局終局；這是本次明確保留的版本差異。
 
 ## Session 日誌（最新在上，一行一 session）
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-16 | Phase 7A：桌面 AI v2（搜尋樹三次同形、repetition-aware TT、PVS/aspiration/history、選擇性 quiescence、戰術排序、光路/機動性/法老安全評估）；桌面和局後鎖定落子；selfplay 分開正式和局與手數上限 | pytest 116 ✅；medium vs random 20/20（0.2s/手）✅；v2 vs v1 3勝0敗1截斷（交換先後手）✅；桌面打包/Release v1.1.0 ✅ |
 | 2026-07-06 | Phase 6：www/ Canvas 手機版（engine.js/ai.js/game.js 移植 + 觸控 UI）、export_web_data.py、規則一致性向量測試、Capacitor + APK 建置成功（25.8MB） | pytest 111 ✅（含 web 一致性）；向量 500/500 PASS ✅；瀏覽器實測互動/AI/動畫 ✅；APK BUILD SUCCESSFUL ✅ |
 | 2026-07-05 | Phase 4+5：謎題求解器/生成器（39 題認證目錄）、謎題 GUI+每日一題、音效合成、設定/戰績持久化、PyInstaller 打包、smoke test、發布到 GitHub | pytest 110 ✅；目錄 39 題認證 ✅；smoke test 4 項 ✅；exe 啟動驗證 ✅ |
 | 2026-07-05 | Phase 3：khet/ai.py（negamax+αβ+TT+迭代加深+killer+超時部分採用）、selfplay.py、GUI 人機對戰（QThreadPool+token 防護）；難度實測定級 2/3/6 | pytest 103 ✅；medium vs random 20/20(100%、0.31s/手) ✅；hard vs medium 7勝2敗1和(70%) ✅ |

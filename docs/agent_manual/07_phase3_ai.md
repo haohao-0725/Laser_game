@@ -1,5 +1,25 @@
 # 07 Phase 3 — 對戰 AI（minimax + alpha-beta）
 
+> **現行桌面版（Phase 7A / v1.1.0）**：下方保留 v1 的設計骨架與驗收歷史；
+> 真正執行中的 `khet/ai.py` 已升級為 AI v2。手機 `www/js/ai.js` 依使用者指示維持 v1.0，
+> 不在這次同步範圍。
+
+## AI v2 現行架構
+
+- 迭代加深 PVS/negamax + alpha-beta + aspiration window。
+- 置換表儲存 EXACT/LOWER/UPPER，mate score 以 ply 正規化；重複兩次以上的歷史摘要納入 key。
+- 搜尋路徑逐層維護完整 state 次數，同一 state 第三次出現直接回傳 `DRAW = 0`。
+- 排序：立即殺王 → 有利雷射吃子 → TT best → killer → history heuristic → 一般行動。
+- 不穩定局面啟動選擇性 quiescence；只結算會改變目前光路的行動，避免分支失控。
+- 評估包含材料、法老肉盾/逃生、機動性、Scarab 換位、雷射控制格、反射節點、
+  法老距離、脆弱 blocker、自傷與盾牌吸收壓力。
+- 搜尋層以小型 LRU 重用靠近根部的完整子局面，以 feature cache 重用相同 pieces 的盤面摘要；
+  不複製規則引擎，`apply_action` 仍是唯一行動真值。
+- `search()` 的 info 會回報 depth/score/nodes/qnodes/tt_hits/cutoffs/root_scores。
+
+桌面和局歷史必須由 GUI 的 `position_counts` 傳入 `choose_action()`；selfplay 報告要把
+`draw_repetition` 與 `draw_ply_cap` 分開，禁止再合併成一個無法追溯的 `draw`。
+
 前置：Phase 1 全綠（Phase 2 可並行）。產出物：`khet/ai.py`、`scripts/selfplay.py`。
 里程碑：中等難度穩定擊敗隨機走子 95%+，體感「有在防守法老」。
 

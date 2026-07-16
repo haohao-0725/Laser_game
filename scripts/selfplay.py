@@ -35,12 +35,18 @@ def main() -> int:
     ap.add_argument("--time-limit", type=float, default=None,
                     help="覆蓋 AI 每手秒數上限（驗收快速跑可用 1.0）")
     ap.add_argument("--layout", default="classic")
+    ap.add_argument("--max-plies", type=int, default=MAX_PLIES)
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
     fn1, ai1 = make_player(args.p1, args.time_limit)
     fn2, ai2 = make_player(args.p2, args.time_limit)
-    wins = {args.p1 + "(p1)": 0, args.p2 + "(p2)": 0, "draw": 0}
+    wins = {
+        args.p1 + "(p1)": 0,
+        args.p2 + "(p2)": 0,
+        "draw_repetition": 0,
+        "draw_ply_cap": 0,
+    }
     think_time = {1: [], 2: []}
     lengths = []
 
@@ -49,15 +55,9 @@ def main() -> int:
         silver_is_p1 = (g % 2 == 0)
         state = initial_state(args.layout)
         counts = {state: 1}
-        result = "draw"
-        for ply in range(MAX_PLIES):
-            w = winner(state)
-            if w is not None:
-                p1_color = "SILVER" if silver_is_p1 else "RED"
-                result = args.p1 + "(p1)" if w == p1_color else args.p2 + "(p2)"
-                break
-            if counts.get(state, 0) >= 3:
-                break                       # 三次同形判和
+        result = "draw_ply_cap"
+        plies_played = 0
+        for _ in range(args.max_plies):
             is_p1_turn = (state[0] == "SILVER") == silver_is_p1
             fn, is_ai, idx = (fn1, ai1, 1) if is_p1_turn else (fn2, ai2, 2)
             t0 = time.monotonic()
@@ -66,11 +66,19 @@ def main() -> int:
                 think_time[idx].append(time.monotonic() - t0)
             state, _ = apply_action(state, action)
             counts[state] = counts.get(state, 0) + 1
-        else:
-            ply = MAX_PLIES
+            plies_played += 1
+
+            w = winner(state)
+            if w is not None:
+                p1_color = "SILVER" if silver_is_p1 else "RED"
+                result = args.p1 + "(p1)" if w == p1_color else args.p2 + "(p2)"
+                break
+            if counts[state] >= 3:
+                result = "draw_repetition"
+                break
         wins[result] += 1
-        lengths.append(ply + 1)
-        print(f"game {g + 1}/{args.games}: {result}（{ply + 1} 手）", flush=True)
+        lengths.append(plies_played)
+        print(f"game {g + 1}/{args.games}: {result}（{plies_played} 手）", flush=True)
 
     print("\n===== 報告 =====")
     total = args.games

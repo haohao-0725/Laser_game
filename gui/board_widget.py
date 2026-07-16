@@ -74,7 +74,9 @@ class BoardWidget(QWidget):
 
     def play_action(self, action) -> None:
         """程式化走一手（AI / 對手用）：走完會脈動閃爍提示，讓玩家看清對方動了哪裡。"""
-        if self.mode != "animating":
+        if (self.mode != "animating"
+                and self.controller.winner() is None
+                and not self.controller.is_draw_by_repetition()):
             self._commit(action, pulse=True)
 
     # ------------------------------------------------------------ 幾何
@@ -107,7 +109,8 @@ class BoardWidget(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
         if (self.mode == "animating" or self.input_locked
-                or self.controller.winner() is not None):
+                or self.controller.winner() is not None
+                or self.controller.is_draw_by_repetition()):
             return
         pos = event.position()
 
