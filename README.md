@@ -8,13 +8,13 @@
 
 ## 專案狀態
 
-✅ **桌面版 v1.1.0 + 手機版 v1.0 皆可遊玩**：桌面 PyQt6（雙人對戰、雷射動畫、
+✅ **桌面版 v1.2.0 + 手機版 v1.0 皆可遊玩**：桌面 PyQt6（雙人對戰、雷射動畫、
 AI v2 三難度、39 題謎題、音效戰績、打包 exe）；手機版 Canvas + Capacitor 維持 v1.0。
 桌面 AI v2 已加入完整三次同形搜尋、PVS、戰術延伸與更完整的局面評估，進度見
 [PROGRESS.md](PROGRESS.md)。
 
 📥 **下載遊玩**：[Releases 頁面](https://github.com/haohao-0725/Laser_game/releases/latest)
-下載 `LaserDuel_v1.1.0_win64.zip`，解壓後執行 `LaserDuel.exe`（Windows 10/11 64 位元）。
+下載 `LaserDuel_v1.2.0_win64.zip`，解壓後執行 `LaserDuel.exe`（Windows 10/11 64 位元）。
 
 ## 執行與打包
 

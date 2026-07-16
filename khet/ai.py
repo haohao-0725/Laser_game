@@ -25,12 +25,11 @@ PIECE_VALUE = {
 }
 GUARD_BONUS = 40
 PHARAOH_ESCAPE_BONUS = 8
-MOBILITY_BONUS = 1
 SCARAB_SWAP_BONUS = 4
-BEAM_CELL_BONUS = 1
-BEAM_REFLECTION_BONUS = 6
-BEAM_NEAR_PHARAOH = 40
-SELF_HIT_PENALTY = 80
+BEAM_REFLECTION_BONUS = 2
+BEAM_PRESSURE_BONUS = 12
+BEAM_NEAR_PHARAOH = 60
+SELF_HIT_PENALTY = 300
 THREAT_PHARAOH = 5_000
 ABSORB_PRESSURE = 20
 
@@ -39,8 +38,9 @@ _TIME_CHECK_INTERVAL = 128
 _ASPIRATION = 350
 _Q_DEPTH = 1
 _Q_MAX_MOVES = 12
+_ROOT_REPEAT_PENALTY = 120
 _TT_MAX = 250_000
-_EXPANSION_CACHE_MAX = 256
+_ACTION_CACHE_MAX = 512
 _REP_MASK = (1 << 64) - 1
 
 
@@ -65,12 +65,11 @@ def _position_scores(pieces: tuple) -> tuple[int, int, bool]:
         if piece[0] == "PHARAOH":
             pharaohs[piece[1]] = piece
 
-    mobility = {"RED": 0, "SILVER": 0}
     scarab_swaps = {"RED": 0, "SILVER": 0}
     pharaoh_escapes = {"RED": 0, "SILVER": 0}
     for piece in pieces:
         ptype, color, col, row, _ = piece
-        if ptype == "SPHINX":
+        if ptype not in ("PHARAOH", "SCARAB"):
             continue
         for dcol, drow in MOVE_VECTORS:
             ncol, nrow = col + dcol, row + drow
@@ -78,18 +77,15 @@ def _position_scores(pieces: tuple) -> tuple[int, int, bool]:
                 continue
             target = occ.get((ncol, nrow))
             if target is None and can_occupy(color, ncol, nrow):
-                mobility[color] += 1
                 if ptype == "PHARAOH":
                     pharaoh_escapes[color] += 1
             elif (ptype == "SCARAB" and target is not None
                   and target[0] in ("PYRAMID", "ANUBIS")
                   and can_occupy(color, ncol, nrow)
                   and can_occupy(target[1], col, row)):
-                mobility[color] += 1
                 scarab_swaps[color] += 1
 
     for color, pharaoh in pharaohs.items():
-        scores[color] += mobility[color] * MOBILITY_BONUS
         scores[color] += scarab_swaps[color] * SCARAB_SWAP_BONUS
         scores[color] += pharaoh_escapes[color] * PHARAOH_ESCAPE_BONUS
         guard = 0
@@ -107,7 +103,6 @@ def _position_scores(pieces: tuple) -> tuple[int, int, bool]:
         enemy = other(color)
         _, result = resolve_laser(pieces, color)
         path = result.path[1:]
-        scores[color] += min(len(set(path)), 30) * BEAM_CELL_BONUS
         reflections = sum(
             1 for cell in path[:-1]
             if (cell in occ and occ[cell][0] in ("PYRAMID", "SCARAB"))
@@ -117,6 +112,7 @@ def _position_scores(pieces: tuple) -> tuple[int, int, bool]:
         enemy_pharaoh = pharaohs.get(enemy)
         if enemy_pharaoh is not None:
             distance = _chebyshev_to_path((enemy_pharaoh[2], enemy_pharaoh[3]), path)
+            scores[enemy] -= max(0, 8 - distance) * BEAM_PRESSURE_BONUS
             if distance <= 2:
                 scores[enemy] -= (3 - distance) * BEAM_NEAR_PHARAOH
             if distance <= 1:
@@ -185,8 +181,8 @@ class _Searcher:
         self.tt: dict = {}
         self.killers: dict = {}
         self.history: dict = {}
-        # 迭代加深會重複展開靠近根部的局面；小型 LRU 可省去重做規則結算。
-        self.expansions: OrderedDict = OrderedDict()
+        # 只快取合法行動；子局面必須等走法真的被搜尋時才結算，才能讓剪枝省工。
+        self.action_cache: OrderedDict = OrderedDict()
         self.eval_cache: dict = {}
         self.nodes = 0
         self.qnodes = 0
@@ -211,21 +207,15 @@ class _Searcher:
             self.eval_cache[state] = score
         return score
 
-    def expand(self, state: tuple) -> tuple:
-        cached = self.expansions.get(state)
+    def actions(self, state: tuple) -> tuple:
+        cached = self.action_cache.get(state)
         if cached is not None:
-            self.expansions.move_to_end(state)
+            self.action_cache.move_to_end(state)
             return cached
-        entries = []
-        for index, action in enumerate(legal_actions(state)):
-            if index % 16 == 0:
-                self._check_time()
-            child, result = apply_action(state, action)
-            entries.append((action, child, result))
-        result = tuple(entries)
-        self.expansions[state] = result
-        if len(self.expansions) > _EXPANSION_CACHE_MAX:
-            self.expansions.popitem(last=False)
+        result = tuple(legal_actions(state))
+        self.action_cache[state] = result
+        if len(self.action_cache) > _ACTION_CACHE_MAX:
+            self.action_cache.popitem(last=False)
         return result
 
     def forcing_entries(self, state: tuple) -> tuple:
@@ -234,6 +224,10 @@ class _Searcher:
         occ = board_map(pieces)
         _, current_laser = resolve_laser(pieces, player)
         beam_cells = set(current_laser.path)
+        must_evade_self_hit = (
+            current_laser.event == "hit"
+            and current_laser.hit_piece[1] == player
+        )
         candidates = []
         unchanged_representative = None
         for action in legal_actions(state):
@@ -260,29 +254,39 @@ class _Searcher:
             if index % 12 == 0:
                 self._check_time()
             child, laser = apply_action(state, action)
-            if laser.event == "hit" or winner(child) is not None:
+            evades_self_hit = (
+                must_evade_self_hit
+                and not (laser.event == "hit" and laser.hit_piece[1] == player)
+            )
+            if laser.event == "hit" or winner(child) is not None or evades_self_hit:
                 forcing.append((action, child, laser))
         return tuple(forcing)
 
-    def _order(self, state: tuple, entries: tuple, tt_best, ply: int) -> list:
+    def _order_actions(self, state: tuple, actions: tuple, tt_best, ply: int) -> list:
         player = state[0]
         killers = self.killers.get(ply, ())
+        _, laser = resolve_laser(state[1], player)
+        beam_cells = set(laser.path)
 
-        def priority(entry):
-            action, child, laser = entry
+        def priority(action):
             score = self.history.get((player, action), 0)
-            victor = winner(child)
-            if victor == player:
+            if action == tt_best:
                 score += 4_000_000_000
-            elif laser.event == "hit":
+            if action in killers:
+                score += 3_000_000_000
+
+            source = (action.col, action.row)
+            target = source
+            if isinstance(action, (Move, Swap)):
+                target = (action.col + action.dcol, action.row + action.drow)
+            changes_beam = source in beam_cells or target in beam_cells
+            if laser.event == "hit" and not changes_beam:
                 victim = laser.hit_piece
                 value = PIECE_VALUE[victim[0]] + 100
-                score += (3_000_000_000 + value if victim[1] != player
-                          else -1_000_000_000 - value)
-            if action == tt_best:
-                score += 2_000_000_000
-            if action in killers:
-                score += 1_000_000_000
+                score += (2_000_000_000 + value if victim[1] != player
+                          else -2_000_000_000 - value)
+            elif changes_beam:
+                score += 1_000_000
             if isinstance(action, Swap):
                 score += 300
             elif isinstance(action, Move):
@@ -290,6 +294,23 @@ class _Searcher:
             elif isinstance(action, Rotate):
                 score += 100
             return score
+
+        return sorted(actions, key=priority, reverse=True)
+
+    def _order_entries(self, state: tuple, entries: tuple, tt_best, ply: int) -> list:
+        """已結算的少量戰術走法仍以實際殺王／吃子結果排序。"""
+        player = state[0]
+
+        def priority(entry):
+            action, child, laser = entry
+            if winner(child) == player:
+                return 4_000_000_000
+            if laser.event == "hit":
+                victim = laser.hit_piece
+                value = PIECE_VALUE[victim[0]] + 100
+                return (3_000_000_000 + value if victim[1] != player
+                        else -1_000_000_000 - value)
+            return self.history.get((player, action), 0)
 
         return sorted(entries, key=priority, reverse=True)
 
@@ -352,8 +373,9 @@ class _Searcher:
 
         best = -INF
         best_action = None
-        ordered = self._order(state, self.expand(state), tt_best, ply)
-        for index, (action, child, laser) in enumerate(ordered):
+        ordered = self._order_actions(state, self.actions(state), tt_best, ply)
+        for index, action in enumerate(ordered):
+            child, laser = apply_action(state, action)
             def full(child_counts, child_hash):
                 return -self.negamax(
                     child, depth - 1, -beta, -alpha, ply + 1,
@@ -404,17 +426,24 @@ class _Searcher:
             return DRAW
 
         stand_pat = self._evaluate(state)
-        if qdepth <= 0 or stand_pat >= beta:
+        _, current_laser = resolve_laser(state[1], state[0])
+        must_evade_self_hit = (
+            current_laser.event == "hit"
+            and current_laser.hit_piece[1] == state[0]
+        )
+        if qdepth <= 0:
             return stand_pat
-        if stand_pat > alpha:
+        if not must_evade_self_hit and stand_pat >= beta:
+            return stand_pat
+        if not must_evade_self_hit and stand_pat > alpha:
             alpha = stand_pat
 
         forcing = self.forcing_entries(state)
         if not forcing:
             return stand_pat
 
-        best = stand_pat
-        for action, child, laser in self._order(state, forcing, None, ply)[:_Q_MAX_MOVES]:
+        best = -INF if must_evade_self_hit else stand_pat
+        for action, child, laser in self._order_entries(state, forcing, None, ply)[:_Q_MAX_MOVES]:
             def descend(child_counts, child_hash):
                 return -self.qsearch(
                     child, -beta, -alpha, ply + 1, qdepth - 1,
@@ -469,6 +498,11 @@ def _search_root(searcher: _Searcher, state: tuple, depth: int,
                 if root_alpha < value < beta:
                     value = searcher._descend(child, laser, full, counts, rep_hash)
 
+            # 第二次走回舊局面尚未正式和局，但在均勢時通常只是浪費先手。
+            # 第三次同形仍由 negamax 精確回傳 DRAW，不在此改寫。
+            if counts.get(child, 0) == 1 and abs(value) < MATE_THRESHOLD:
+                value -= _ROOT_REPEAT_PENALTY
+
             scores[action] = value
             if value > best_score:
                 best_score, best_action = value, action
@@ -491,7 +525,10 @@ def search(state: tuple, max_depth: int, time_limit: float = 3.0,
         raise RuntimeError("目前局面已因三次同形判和")
 
     searcher = _Searcher(time.monotonic() + time_limit)
-    root_entries = list(searcher.expand(state))
+    root_entries = []
+    for action in searcher.actions(state):
+        child, laser = apply_action(state, action)
+        root_entries.append((action, child, laser))
     if not root_entries:
         raise RuntimeError("無合法行動（規則上不可能）")
     rng = rng or random.Random()
@@ -504,7 +541,14 @@ def search(state: tuple, max_depth: int, time_limit: float = 3.0,
     completed_scores = {}
     prev_scores = {}
 
-    for depth in range(1, max_depth + 1):
+    target_depth = max_depth
+    if max_depth >= 3:
+        if len(state[1]) <= 10:
+            target_depth += 2
+        elif len(state[1]) <= 16:
+            target_depth += 1
+
+    for depth in range(1, target_depth + 1):
         ordered = sorted(
             root_entries,
             key=lambda entry: -prev_scores.get(entry[0], 0),
@@ -553,13 +597,14 @@ def search(state: tuple, max_depth: int, time_limit: float = 3.0,
         "tt_hits": searcher.tt_hits,
         "cutoffs": searcher.cutoffs,
         "root_scores": completed_scores,
+        "target_depth": target_depth,
     }
     return best_action, info
 
 
 DIFFICULTIES = {
     "easy": dict(max_depth=2, time_limit=1.0, noise=250),
-    "medium": dict(max_depth=3, time_limit=3.0, noise=0),
+    "medium": dict(max_depth=4, time_limit=3.0, noise=0),
     "hard": dict(max_depth=7, time_limit=5.0, noise=0),
 }
 

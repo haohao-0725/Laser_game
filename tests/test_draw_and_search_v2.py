@@ -1,12 +1,13 @@
 """桌面 AI v2：三次同形必須是搜尋與 GUI 都認得的真正終局。"""
 import os
+import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
 from gui.game_controller import GameController
-from khet.ai import search
+from khet.ai import _Searcher, search
 from khet.engine import Rotate, apply_action, initial_state, legal_actions, winner
 
 
@@ -89,4 +90,21 @@ def test_quiescence_sees_mate_threat_beyond_nominal_depth():
     assert all(
         winner(apply_action(defended, reply)[0]) != "RED"
         for reply in legal_actions(defended)
+    )
+
+
+def test_quiescence_includes_actions_that_evade_self_hit():
+    pieces = tuple(sorted([
+        ("SPHINX", "RED", 0, 0, 2),
+        ("SPHINX", "SILVER", 9, 7, 0),
+        ("PHARAOH", "RED", 5, 1, 0),
+        ("PHARAOH", "SILVER", 4, 6, 0),
+        ("PYRAMID", "SILVER", 9, 5, 0),
+    ]))
+    state = ("SILVER", pieces)
+    entries = _Searcher(time.monotonic() + 1.0).forcing_entries(state)
+
+    assert any(
+        laser.event != "hit" or laser.hit_piece[1] != "SILVER"
+        for _, _, laser in entries
     )

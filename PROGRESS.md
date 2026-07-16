@@ -5,7 +5,7 @@
 
 ## 目前狀態
 
-- **階段**：Phase 0–7A 完成 ✅ 桌面版 AI v2／v1.1.0 已完成；手機版維持 v1.0。
+- **階段**：Phase 0–7A 完成 ✅ 桌面版 AI v2 強度調校／v1.2.0 已發布；手機版維持 v1.0。
 - **可能的後續（Phase 7 選配）**：線上對戰、棋譜重播、自訂佈局編輯器、ELO、
   AI 認證平衡開局庫。手機版 AI v2／三次同形同步此次依使用者指示暫不維護。
 - **重生手機版建置的方法**（android/ 是 gitignore）：
@@ -46,6 +46,7 @@
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-16 | AI v2 強度調校：惰性子局面展開、局部特徵快取、連續光路壓力、自傷逃脫 qsearch、根節點重複降權、少子局面延伸；新增跨版本／自我對弈工具；發布桌面 v1.2.0 | pytest 117 ✅；v2 vs v1 跨版圖 10勝0敗（3s）✅；v2 vs v2 6銀勝2紅勝2截斷、無三次同形（1s）；exe/smoke/Release ✅ |
 | 2026-07-16 | Phase 7A：桌面 AI v2（搜尋樹三次同形、repetition-aware TT、PVS/aspiration/history、選擇性 quiescence、戰術排序、光路/機動性/法老安全評估）；桌面和局後鎖定落子；selfplay 分開正式和局與手數上限 | pytest 116 ✅；medium vs random 20/20（0.2s/手）✅；v2 vs v1 3勝0敗1截斷（交換先後手）✅；桌面打包/Release v1.1.0 ✅ |
 | 2026-07-06 | Phase 6：www/ Canvas 手機版（engine.js/ai.js/game.js 移植 + 觸控 UI）、export_web_data.py、規則一致性向量測試、Capacitor + APK 建置成功（25.8MB） | pytest 111 ✅（含 web 一致性）；向量 500/500 PASS ✅；瀏覽器實測互動/AI/動畫 ✅；APK BUILD SUCCESSFUL ✅ |
 | 2026-07-05 | Phase 4+5：謎題求解器/生成器（39 題認證目錄）、謎題 GUI+每日一題、音效合成、設定/戰績持久化、PyInstaller 打包、smoke test、發布到 GitHub | pytest 110 ✅；目錄 39 題認證 ✅；smoke test 4 項 ✅；exe 啟動驗證 ✅ |
