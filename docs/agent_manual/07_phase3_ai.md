@@ -1,8 +1,8 @@
 # 07 Phase 3 — 對戰 AI（minimax + alpha-beta）
 
-> **現行桌面版（Phase 7A / v1.2.0）**：下方保留 v1 的設計骨架與驗收歷史；
-> 真正執行中的 `khet/ai.py` 已升級為 AI v2。手機 `www/js/ai.js` 依使用者指示維持 v1.0，
-> 不在這次同步範圍。
+> **現行雙平台版本（Phase 7A / v1.2.1）**：下方保留 v1 的設計骨架與驗收歷史；
+> 真正執行中的 `khet/ai.py` 與手機 `www/js/ai.js` 均已升級為 AI v2；手機版以
+> Web Worker 執行相同搜尋架構，避免 3–5 秒搜尋阻塞 UI。
 
 ## AI v2 現行架構
 

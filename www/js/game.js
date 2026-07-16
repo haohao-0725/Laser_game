@@ -31,15 +31,39 @@
   // ---- 遊戲狀態 ----
   var COLOR_NAMES = { SILVER: '銀方', RED: '紅方' };
   var AI_NAMES = { easy: '簡單', medium: '中等', hard: '困難' };
-  var state, history, aiDifficulty = null, aiColor = 'RED';
+  var state, history, positionCounts, aiDifficulty = null, aiColor = 'RED';
   var selected = null, targets = [], lastMove = [], pulse = 0;
-  var anim = null, animTimer = null, pulseTimer = null, locked = false;
+  var anim = null, animTimer = null, pulseTimer = null, locked = false, drawn = false;
+  var aiWorker = null, aiRequestId = 0;
+
+  function resetAIWorker() {
+    aiRequestId++;
+    if (aiWorker) aiWorker.terminate();
+    aiWorker = (typeof Worker !== 'undefined') ? new Worker('js/ai_worker.js') : null;
+    if (!aiWorker) return;
+    aiWorker.onmessage = function (event) {
+      var data = event.data;
+      if (data.id !== aiRequestId) return;
+      if (data.error) {
+        locked = false; updateStatus();
+        alert('AI 搜尋失敗：' + data.error);
+        return;
+      }
+      locked = false; commit(data.action, true);
+    };
+    aiWorker.onerror = function (event) {
+      locked = false; updateStatus();
+      alert('AI 背景執行失敗：' + event.message);
+    };
+  }
 
   function newGame(layout) {
     state = E.initialState(layout || currentLayout);
     currentLayout = layout || currentLayout;
     history = [state];
-    selected = null; targets = []; lastMove = []; pulse = 0; locked = false;
+    positionCounts = new Map(); positionCounts.set(E.stateKey(state), 1);
+    selected = null; targets = []; lastMove = []; pulse = 0; locked = false; drawn = false;
+    resetAIWorker();
     stopTimers();
     render(); updateStatus();
   }
@@ -189,7 +213,7 @@
   }
 
   function onTap(px, py) {
-    if (locked || anim || E.winner(state) !== null) return;
+    if (locked || drawn || anim || E.winner(state) !== null) return;
     var cell = cellAt(px, py);
     if (!cell) { selected = null; targets = []; updateRotateButtons(); render(); return; }
     // 點到行動目標 → 執行
@@ -204,6 +228,8 @@
   function commit(action, pulseAfter) {
     var res = E.applyAction(state, action);
     state = res.state; history.push(state);
+    var key = E.stateKey(state);
+    positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
     selected = null; targets = []; updateRotateButtons();
     lastMove = actionCells(action); pulse = 0;
     anim = { path: res.path, event: res.event, hit: res.hit, progress: 1, explosion: 0, pulseAfter: pulseAfter };
@@ -242,28 +268,53 @@
       setTimeout(function () { if (confirm(msg + '\n\n再來一局？')) newGame(currentLayout); }, 100);
       return;
     }
+    if ((positionCounts.get(E.stateKey(state)) || 0) >= 3) {
+      drawn = true; locked = true; updateStatus();
+      setTimeout(function () {
+        if (confirm('三次同形，本局和局。\n\n再來一局？')) newGame(currentLayout);
+      }, 100);
+      return;
+    }
     maybeStartAI();
   }
   function maybeStartAI() {
-    if (aiDifficulty && state.player === aiColor && E.winner(state) === null) {
+    if (aiDifficulty && !drawn && state.player === aiColor && E.winner(state) === null) {
       locked = true; statusEl.textContent = 'AI（' + AI_NAMES[aiDifficulty] + '）思考中…';
-      setTimeout(function () {
-        var action = AI.chooseAction(state, aiDifficulty);
+      var requestId = ++aiRequestId;
+      if (aiWorker) {
+        aiWorker.postMessage({
+          id: requestId,
+          state: state,
+          difficulty: aiDifficulty,
+          historyCounts: Array.from(positionCounts.entries())
+        });
+      } else setTimeout(function () {
+        if (requestId !== aiRequestId) return;
+        var action = AI.chooseAction(state, aiDifficulty, {
+          historyCounts: new Map(positionCounts)
+        });
         locked = false; commit(action, true);
       }, 30);
     }
   }
 
   function undo() {
-    if (locked || anim) return;
+    if ((locked && !drawn) || anim) return;
     var steps = aiDifficulty ? 2 : 1;
     while (steps-- > 0 && history.length > 1) { history.pop(); state = history[history.length - 1]; }
+    positionCounts = new Map();
+    history.forEach(function (oldState) {
+      var key = E.stateKey(oldState);
+      positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
+    });
+    drawn = false; locked = false;
     selected = null; targets = []; lastMove = []; updateRotateButtons(); render(); updateStatus();
   }
 
   function updateStatus() {
     var mode = aiDifficulty ? ('人機（AI：' + AI_NAMES[aiDifficulty] + '）') : '雙人對戰';
-    statusEl.textContent = mode + '　｜　輪到 ' + COLOR_NAMES[state.player];
+    statusEl.textContent = drawn ? (mode + '　｜　三次同形和局')
+      : (mode + '　｜　輪到 ' + COLOR_NAMES[state.player]);
   }
 
   // ---- 綁定 ----

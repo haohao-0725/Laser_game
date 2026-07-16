@@ -2,8 +2,8 @@
 // state = {player, pieces}；pieces = 排序後的陣列，每個元素 [type,color,col,row,ori]。
 // 排序、方向、朝向、雷射解算必須與 Python 版位元級一致（由向量測試把關）。
 (function () {
-  var RULES = (typeof window !== 'undefined') ? window.RULES_DATA
-                                              : require('./rules_data.js');
+  var RULES = (typeof globalThis !== 'undefined' && globalThis.RULES_DATA)
+    ? globalThis.RULES_DATA : require('./rules_data.js');
   var LASER = RULES.laser_table;
   var LAYOUTS = RULES.layouts;
   var COLS = LAYOUTS.board.cols;      // 10
@@ -175,5 +175,5 @@
     stateKey: stateKey
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
-  if (typeof window !== 'undefined') window.KhetEngine = API;
+  if (typeof globalThis !== 'undefined') globalThis.KhetEngine = API;
 })();

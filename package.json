@@ -1,6 +1,7 @@
 {
   "name": "laser-duel",
-  "version": "1.0.0",
+  "version": "1.2.1",
+  "androidVersionCode": 3,
   "description": "雷射對決 Laser Duel — 手機版（Capacitor）",
   "private": true,
   "scripts": {

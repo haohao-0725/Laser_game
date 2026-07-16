@@ -26,7 +26,7 @@ def main() -> None:
         f.write("(function(){\n")
         f.write(f"  var DATA = {body};\n")
         f.write("  if (typeof module !== 'undefined' && module.exports) module.exports = DATA;\n")
-        f.write("  if (typeof window !== 'undefined') window.RULES_DATA = DATA;\n")
+        f.write("  if (typeof globalThis !== 'undefined') globalThis.RULES_DATA = DATA;\n")
         f.write("})();\n")
     print(f"OK: 已寫出 {out}（{len(body)} bytes）")
 

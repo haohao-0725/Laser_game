@@ -5,14 +5,15 @@
 
 ## 目前狀態
 
-- **階段**：Phase 0–7A 完成 ✅ 桌面版 AI v2 強度調校／v1.2.0 已發布；手機版維持 v1.0。
+- **階段**：Phase 0–7A 完成 ✅ 桌面版／手機版 AI v2 已同步並發布 v1.2.1。
 - **可能的後續（Phase 7 選配）**：線上對戰、棋譜重播、自訂佈局編輯器、ELO、
-  AI 認證平衡開局庫。手機版 AI v2／三次同形同步此次依使用者指示暫不維護。
+  AI 認證平衡開局庫；手機版 v1.2.1 尚待實機完整對局驗收。
 - **重生手機版建置的方法**（android/ 是 gitignore）：
   1. `npm install`
   2. `.\venv\Scripts\python.exe scripts\export_web_data.py`（規則改過才需要）
   3. `npx cap add android`（若無 android/）→ `npx cap sync android`
-  4. `cmd /c "cd /d <root>\android && .\gradlew.bat assembleDebug --no-daemon"`
+  4. `.\venv\Scripts\python.exe scripts\set_android_version.py`
+  5. `cmd /c "cd /d <root>\android && .\gradlew.bat assembleDebug --no-daemon"`
      （環境變數見 AGENT.md；產物 android\app\build\outputs\apk\debug\app-debug.apk）
 
 ## Phase 總表
@@ -40,12 +41,13 @@
 
 ## 異常記錄（發現文件矛盾、規則疑義、環境問題都記在這）
 
-- 手機版仍是 v1.0：尚未同步桌面 AI v2，也尚未加入三次同形對局終局；這是本次明確保留的版本差異。
+- 手機版 v1.2.1 已同步 AI v2 與三次同形終局；目前無 ADB 裝置，實機完整對局仍待驗收。
 
 ## Session 日誌（最新在上，一行一 session）
 
 | 日期 | 做了什麼 | 測試狀態 |
 |---|---|---|
+| 2026-07-16 | 手機版同步 AI v2：PVS/TT/aspiration/history/quiescence、三次同形歷史與終局、少子延伸；新增 Web Worker 避免搜尋阻塞 UI；發布雙平台 v1.2.1（Android code 3） | pytest 118 ✅；JS AI 自測 ✅；規則向量 400/400 ✅；Playwright Worker 回手 ✅；Windows/APK 建置、簽章與 Release ✅；實機待驗收 |
 | 2026-07-16 | AI v2 強度調校：惰性子局面展開、局部特徵快取、連續光路壓力、自傷逃脫 qsearch、根節點重複降權、少子局面延伸；新增跨版本／自我對弈工具；發布桌面 v1.2.0 | pytest 117 ✅；v2 vs v1 跨版圖 10勝0敗（3s）✅；v2 vs v2 6銀勝2紅勝2截斷、無三次同形（1s）；exe/smoke/Release ✅ |
 | 2026-07-16 | Phase 7A：桌面 AI v2（搜尋樹三次同形、repetition-aware TT、PVS/aspiration/history、選擇性 quiescence、戰術排序、光路/機動性/法老安全評估）；桌面和局後鎖定落子；selfplay 分開正式和局與手數上限 | pytest 116 ✅；medium vs random 20/20（0.2s/手）✅；v2 vs v1 3勝0敗1截斷（交換先後手）✅；桌面打包/Release v1.1.0 ✅ |
 | 2026-07-06 | Phase 6：www/ Canvas 手機版（engine.js/ai.js/game.js 移植 + 觸控 UI）、export_web_data.py、規則一致性向量測試、Capacitor + APK 建置成功（25.8MB） | pytest 111 ✅（含 web 一致性）；向量 500/500 PASS ✅；瀏覽器實測互動/AI/動畫 ✅；APK BUILD SUCCESSFUL ✅ |

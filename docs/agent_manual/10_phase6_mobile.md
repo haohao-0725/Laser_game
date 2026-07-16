@@ -5,6 +5,16 @@
 `Z:\VScode\Ricochet_Robots_Mobile`（成品參考）與
 `Z:\VScode\_FOR_agent_common_information\android-studio-environment.md`（環境）。
 
+## 現行版本（v1.2.1）
+
+- `www/js/ai.js` 已同步桌面 AI v2：迭代加深 PVS、aspiration window、TT、killer/history、
+  三次同形搜尋、選擇性 quiescence、光路／法老評估與少子局面延伸。
+- `www/js/ai_worker.js` 在背景執行 AI，Canvas 動畫與觸控主執行緒不被 3–5 秒搜尋阻塞。
+- `game.js` 維護完整 position counts；第三次同形鎖定為正式和局，悔棋會重建計數。
+- `www/js/ai_test.js` 驗證一步殺、三次同形與已和局拒搜；pytest 另比對 Python／JS
+  在跨版圖隨機局面的靜態評估完全一致。
+- Android `versionCode=3`、`versionName=1.2.1`；debug APK 使用既有相同簽章，可覆蓋安裝。
+
 ## 1. `www/` 結構（純靜態，先在桌面瀏覽器開發）
 
 ```
@@ -42,7 +52,8 @@ www/
 3. 不到 N/N 不准進下一步
 ```
 
-**實測結果（2026-07-06）：500/500 PASS**，一次通過。engine.js 與 khet/engine.py 位元級一致。
+**實測結果（2026-07-16）：400/400 PASS**。engine.js 與 khet/engine.py 位元級一致；
+AI 評估另由 `test_web_ai_v2_consistency` 跨語言比對。
 pytest 的 `tests/test_web_consistency.py` 把這條流程包成 CI 測試（有 node 才跑）。
 關鍵移植陷阱：JS 的 pieces 排序 comparator 必須完全複製 Python `sorted()` 對 tuple 的
 字典序（type,color 字串比較 → col,row,ori 數字比較），否則序列化比對會全錯。
@@ -60,6 +71,7 @@ pytest 的 `tests/test_web_consistency.py` 把這條流程包成 CI 測試（有
 # www/ 完成並通過向量測試後（Node 專案初始化參考前作 package.json）
 npx cap init   # 已 init 過則略
 npx cap sync android
+.\venv\Scripts\python.exe scripts\set_android_version.py
 cmd /c "cd /d <android平台目錄> && .\gradlew.bat assembleDebug --no-daemon"
 # 環境細節（SDK 路徑、簽章、E:\ 磁碟）見 android-studio-environment.md
 ```
